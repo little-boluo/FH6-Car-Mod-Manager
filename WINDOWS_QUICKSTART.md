@@ -1,6 +1,6 @@
 # Windows 构建与使用
 
-本压缩包是 0.8.1 源码构建包，不含预编译 EXE。旧版预览已由用户截图确认能显示车辆；新版界面与缩略图构图效果需在 Windows 上确认。
+本压缩包是 0.8.2 源码构建包，不含预编译 EXE。本版修复缩略图失败后重启反复生成的问题，沿用 0.8.1 渲染组件。
 
 ## 完整构建
 
@@ -64,3 +64,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows.ps1 -Manager
 0.8.0：使用独立缩略图工程，排除主编辑器和文档组件，保留自包含运行库。新增缓存限额、临时任务清理、圆角顶部导航和居中署名。建议解压到新目录重新构建；构建输出会清除旧 renderer。完成后查看 `package-size-report.txt` 获取实际安装体积。缓存限额不包含渲染过程中使用的临时空间。
 
 0.8.1：修正独立渲染工程遗漏的资源构建设置，增加应用 PRI 发布检查。建议解压到新目录，关闭游戏和管理器后重新运行 `Build_EXE.bat`；脚本自动清理该渲染器的旧中间文件。若失败，请提供 `renderer-resources.log`、`renderer-check.log` 和 `build-windows.log`。0.8.0 的 C# 编译已由用户日志证实成功，但 PNG 自检失败；0.8.1 仍需 Windows 运行验证。
+
+## 失败的预览
+
+预览失败后会保存记录，重启不再自动尝试。选中对应车辆，点击“重建所选缩略图”可手动重试；更换模组内容后允许重新生成。游戏启动或程序关闭造成的中断不会记为失败。
+
+失败记录：`%LOCALAPPDATA%\FH6CarModManager\thumbnails\failed-previews.json`。旧版没有记录，升级后此前失败的模组可能再尝试一次。

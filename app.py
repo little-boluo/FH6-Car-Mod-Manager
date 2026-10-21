@@ -54,7 +54,7 @@ class Application:
             except (OSError, ValueError):
                 pass
         i18n.set_language(self.config.get('language', 'zh'))
-        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.1'))
+        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.2'))
         root.geometry(f'1440x{min(960, max(700, root.winfo_screenheight()-80))}')
         root.minsize(1050, 670)
         root.configure(bg=BG)
@@ -99,7 +99,7 @@ class Application:
         header.pack_propagate(False)
         tk.Label(header, text='FH6', font=('Segoe UI', 22, 'bold'), bg=ACCENT, fg='white').pack(side='left', padx=(24, 12))
         tk.Label(header, text=t('车辆模组管理器'), font=('Microsoft YaHei UI', 11), bg=ACCENT, fg='#e1efff').pack(side='left')
-        tk.Label(header, text='v0.8.1', bg=ACCENT, fg='#d6e9ff', font=('Segoe UI', 10)).pack(side='right', padx=24)
+        tk.Label(header, text='v0.8.2', bg=ACCENT, fg='#d6e9ff', font=('Segoe UI', 10)).pack(side='right', padx=24)
         navigation = tk.Frame(header, bg=ACCENT)
         navigation.pack(side='right', padx=24)
         self.page_buttons = {}
@@ -270,7 +270,7 @@ class Application:
             child.destroy()
         self.buttons = []
         self.build()
-        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.1'))
+        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.2'))
         if self.manager:
             self.folder.set(str(self.manager.folder))
             self.show_vehicle_directory()

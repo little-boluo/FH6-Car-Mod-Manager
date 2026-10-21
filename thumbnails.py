@@ -14,6 +14,7 @@ import threading
 import time
 
 from process_watch import game_is_running
+from thumbnail_failures import FailureCache, FAILURE_STATUS
 from cache_storage import prune_cache, cleanup_stale_jobs, rotate_error_log, OWNER_FILE, OWNER_VALUE
 from renderer_runtime import external_dll_search, renderer_environment, renderer_failure
 
@@ -94,6 +95,8 @@ class ThumbnailService:
         cleanup_stale_jobs(self.cache)
         prune_cache(self.cache)
         rotate_error_log(self.cache)
+        self.state_lock = threading.RLock()
+        self.failures = FailureCache(self.cache)
         self.renderer = Path(renderer) if renderer else renderer_path()
         self.running, self.timeout = running, timeout
         self.tasks, self.results = queue.Queue(), queue.Queue()
@@ -108,30 +111,35 @@ class ThumbnailService:
         self.thread.start()
 
     def set_allowed(self, allowed):
-        (self.allowed.set if allowed else self.allowed.clear)()
+        with self.state_lock:
+            (self.allowed.set if allowed else self.allowed.clear)()
 
     def reset(self):
-        self.generation += 1
-        self.completed.clear()
-        self.pending.clear()
-        # Explicit user refresh invalidates global texture changes not covered by car ZIP hashes.
-        self.force_generation = True
-        self.regenerated.clear()
-        self.revisions.clear()
-        self.forced.clear()
+        with self.state_lock:
+            self.generation += 1
+            self.completed.clear()
+            self.pending.clear()
+            # Explicit user refresh invalidates global texture changes not covered by car ZIP hashes.
+            self.force_generation = True
+            self.regenerated.clear()
+            self.revisions.clear()
+            self.forced.clear()
+
 
     def signature(self, source, original=None, game_root=None):
         return (stamp(source), stamp(original), str(game_root), stamp(self.renderer) if self.renderer.is_file() else None)
 
     def invalidate(self, source, original=None, game_root=None):
         """Invalidate one source without cancelling or clearing other vehicles."""
-        self.drain()
-        signature = self.signature(source, original, game_root)
-        self.revisions[signature] = self.revisions.get(signature, 0) + 1
-        self.forced.add(signature)
-        self.pending.discard(signature)
-        old = self.completed.pop(signature, (None, ''))
-        return old[0]
+        with self.state_lock:
+            self.drain()
+            signature = self.signature(source, original, game_root)
+            self.revisions[signature] = self.revisions.get(signature, 0) + 1
+            self.forced.add(signature)
+            self.pending.discard(signature)
+            old = self.completed.pop(signature, (None, ''))
+            return old[0]
+
 
     def drain(self):
         changed = False
@@ -159,6 +167,8 @@ class ThumbnailService:
             if result[0] is None or result[0].is_file():
                 return result
             self.completed.pop(signature, None)
+        if signature not in self.forced and self.failures.contains_file(signature[0]):
+            return None, FAILURE_STATUS
         if not self.renderer.is_file():
             return None, '未安装 3D 渲染组件'
         if signature not in self.pending and self.allowed.is_set():
@@ -179,8 +189,46 @@ class ThumbnailService:
             raise Paused()
         if stamp(req.source) != req.signature[0] or stamp(req.original) != req.signature[1]:
             raise OSError(t('文件已变更'))
-        # Check content-addressed cache before writing full archive copies.
+        if not req.force and self.failures.contains_file(req.signature[0]):
+            return None, FAILURE_STATUS
+        # Hash only when this file has no known failure (e.g. a copied/new version).
         mod_hash = digest_copy(req.source, check=lambda: self._check(req))
+        if not req.force and self.failures.contains_hash(mod_hash):
+            with self.state_lock:
+                self._check(req)
+                self._remember_failure(req, mod_hash)
+            return None, FAILURE_STATUS
+        try:
+            result = self._render(req, mod_hash)
+        except Paused:
+            raise
+        except Exception:
+            with self.state_lock:
+                # Closing, pausing, or superseding this request is not a mod failure.
+                self._check(req)
+                try:
+                    unchanged = self.signature(req.source, req.original, req.game_root) == req.signature
+                    stopped = not self.running()
+                except OSError:
+                    unchanged, stopped = False, False
+                if unchanged and stopped:
+                    self._remember_failure(req, mod_hash)
+            raise
+        with self.state_lock:
+            self._check(req)
+            try:
+                self.failures.forget(mod_hash)
+            except OSError as exc:
+                self._log_error(req, exc, 'Could not clear failed-preview record')
+        return result
+
+    def _remember_failure(self, req, mod_hash):
+        try:
+            self.failures.remember(req.signature[0], mod_hash)
+        except OSError as exc:
+            self._log_error(req, exc, 'Could not save failed-preview record')
+
+    def _render(self, req, mod_hash):
         base_hash = digest_copy(req.original, check=lambda: self._check(req)) if req.original else ''
         key = cache_key(mod_hash, base_hash, req.game_root, req.signature[3])
         target = self.cache / (key + '.png')
@@ -248,18 +296,22 @@ class ThumbnailService:
             except Paused:
                 result = None
             except Exception as exc:
-                result = (None, '预览失败 · 可重试')
-                try:
-                    rotate_error_log(self.cache)
-                    with (self.cache / 'errors.log').open('a', encoding='utf-8') as f:
-                        f.write(f'{req.source.name}: {type(exc).__name__}: {exc}\n')
-                except OSError:
-                    pass
+                result = (None, FAILURE_STATUS)
+                self._log_error(req, exc)
             self.results.put((req, result))
 
+    def _log_error(self, req, exc, context='Preview failed'):
+        try:
+            rotate_error_log(self.cache)
+            with (self.cache / 'errors.log').open('a', encoding='utf-8') as f:
+                f.write(f'{req.source.name}: {context}: {type(exc).__name__}: {exc}\n')
+        except OSError:
+            pass
+
     def close(self):
-        self.closed.set()
-        self.allowed.clear()
+        with self.state_lock:
+            self.closed.set()
+            self.allowed.clear()
         proc = self.process
         if proc and proc.poll() is None:
             try:

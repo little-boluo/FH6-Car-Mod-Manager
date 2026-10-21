@@ -12,7 +12,7 @@ def t(message):
 
 
 EN = {
-    'FH6 Car Mod Manager · 车辆模组管理器 0.8.1': 'FH6 Car Mod Manager 0.8.1',
+    'FH6 Car Mod Manager · 车辆模组管理器 0.8.2': 'FH6 Car Mod Manager 0.8.2',
     '上次使用的模组目录 · 运行状态检测中': 'Last mod folder · Checking game status',
     '尚未定位 mediapc\\Cars': 'mediapc\\Cars not located',
     '正在检测游戏目录': 'Locating the game folder',
@@ -172,6 +172,7 @@ EN = {
     '已生成': 'Rendered',
     '渲染超时\n': 'Render timed out\n',
     '渲染组件没有输出有效 PNG': 'The renderer did not produce a valid PNG',
+    '预览失败 · 手动重试': 'Preview failed · Retry manually',
     '预览失败 · 可重试': 'Preview failed · Retry available',
     '无法读取 Windows 进程列表': 'Cannot read the Windows process list',
     'Windows 进程枚举未能完成': 'Windows process enumeration did not finish',
