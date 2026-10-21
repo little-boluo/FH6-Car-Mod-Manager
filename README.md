@@ -1,1 +1,189 @@
+# FH6 Car Mod Manager   100%AI
 
+**《极限竞速：地平线 6》车辆模组管理器**
+
+将车辆模组的导入、启用、切换和删除集中到一个窗口中。通过车辆缩略图和宫格界面，直观区分不同模组及同一辆车的多个版本，减少反复打开游戏文件夹、手动修改文件名的操作。
+
+**支持 Steam / Xbox 版 · 简体中文 / English · Windows 10 / 11 x64**
+
+**BY：bilibili \_-菠小萝-\_**
+
+## 主要功能
+
+| 功能 | 说明 |
+| --- | --- |
+| 自动定位游戏 | 检测游戏安装位置，区分 Steam 与 Xbox 目录结构；未找到时可手动指定 |
+| 拖放安装 | 将一个或多个车辆 ZIP 拖入程序窗口，也可以通过按钮批量导入 |
+| 文件名校验 | 导入前与游戏原版车辆目录核对文件名，不匹配的模组会被拒绝 |
+| 一键启用 / 禁用 | 通过切换 `.zip` 与 `.zipdisabled` 后缀管理状态 |
+| 同名多版本管理 | 同一车辆可以保留多个模组版本，但最多同时启用一个 |
+| 自动车辆预览 | 使用基于 ForzaTech Studio 的独立渲染组件生成车辆缩略图 |
+| 宫格与筛选 | 上方显示预览、下方显示文件名；支持搜索及全部、已启用、已禁用、同名版本筛选 |
+| 单车预览重建 | 只重新生成当前选中车辆的缩略图，保留其他车辆缓存 |
+| 删除模组 | 删除选中的模组，默认交由 Windows 回收站处理 |
+| 游戏运行锁定 | 检测到游戏运行时，操作按钮灰显，禁止导入、切换、删除及修改设置 |
+| 中英文界面 | 在设置页切换简体中文 / English，立即生效并记忆选择 |
+| 缓存空间管理 | 自动清理过期预览、符合条件的残留临时任务，并限制预览缓存大小 |
+
+## 下载与运行
+
+1. 在仓库的 **Releases** 页面下载 `FH6CarModManager-win-x64.zip` 便携包。
+2. 将压缩包**完整解压**到一个可写的文件夹。
+3. 运行 `FH6CarModManager.exe`。
+4. 首次启动后确认程序识别的游戏与模组目录。
+
+请保留 EXE 同目录下的 `_internal`、`renderer` 和许可文件。不要只复制 EXE，也不要直接在压缩包中运行。
+
+便携版使用者无需单独安装 Python。自动缩略图需要完整的渲染组件及可用的 Windows 图形环境。
+
+> GitHub 自动提供的 `Source code (zip)` 是源码包。直接使用程序，请下载 Release 中单独附加的便携包。
+
+## 使用方法
+
+### 1. 确认游戏目录
+
+程序会优先查找 `forzahorizon6.exe`，并根据安装结构确定模组目录。缺少对应模组文件夹时，会创建该文件夹。
+
+| 版本 | 游戏程序位置 | 模组目录 | 原版车辆校验目录 |
+| --- | --- | --- | --- |
+| Steam | `Forza Horizon 6\forzahorizon6.exe` | `Forza Horizon 6\mediapc\cars` | `Forza Horizon 6\media\cars` |
+| Xbox | `Forza Horizon 6\Content\forzahorizon6.exe` | `Forza Horizon 6\Content\mediapc\Cars` | `Forza Horizon 6\Content\media\cars` |
+
+Steam 安装位置支持检测不同磁盘上的 Steam 库。如果自动检测失败，可以在设置页手动指定位置。使用自定义模组目录时，还需确认原版车辆校验目录正确。
+
+识别目录后，程序会显示其中已有的 `.zip` 和 `.zipdisabled` 模组。
+
+### 2. 导入车辆模组
+
+关闭游戏，将车辆 `.zip` 文件拖入程序窗口，或点击 **导入车辆 ZIP** 选择文件。
+
+导入文件的完整名称（包括 `.zip` 后缀）必须与原版 `media\cars` 目录中的某个车辆文件名一致，比较时不区分大小写。
+
+例如，原版目录存在 `Example_Car.zip`：
+
+| 导入文件名 | 结果 |
+| --- | --- |
+| `Example_Car.zip` | 允许导入 |
+| `example_car.ZIP` | 允许导入 |
+| `Example_Car (1).zip` | 拒绝导入 |
+| `Example_Car_改装版.zip` | 拒绝导入 |
+
+下载文件若被浏览器添加了 `(1)` 等后缀，请先恢复其正确的车辆文件名。无法读取或没有指定校验目录时，程序不会跳过校验。
+
+安装时复制完整 ZIP 到模组目录，不需要手动解压，也不覆盖原版 `media\cars` 文件。
+
+### 3. 启用、禁用与切换版本
+
+选择一张车辆卡片，使用窗口底部的按钮进行操作。
+
+- **启用**：将目标版本恢复为游戏识别的车辆 ZIP 文件名。
+- **禁用**：将扩展名改为 `.zipdisabled`。
+- **切换同名版本**：启用目标版本，同时禁用该车辆当前启用的其他版本。
+
+同名备用版本由管理器自动添加区分后缀，例如：
+
+```text
+Example_Car.zip
+Example_Car__fh6mm_v1.zipdisabled
+Example_Car__fh6mm_v2.zipdisabled
+```
+
+切换时，管理器会自动调整文件名，使启用版本使用原始车辆名称，禁用版本使用区分后缀。无需手动交换文件名。
+
+### 4. 查看与刷新缩略图
+
+程序在后台为可见的车辆卡片请求预览，并缓存生成结果。禁用的模组也可以生成缩略图，无需先启用。
+
+如果某个预览生成失败，或需要刷新共享贴图变化后的效果，选中该车辆，点击 **重建所选缩略图**。这只刷新当前选中车辆，不会清空全部缓存。
+
+缩略图使用临时副本读取模型与贴图，不修改模组原文件。预览效果可能与游戏内不同；如果模组只修改性能参数而没有改变模型，缩略图也可能相同。
+
+### 5. 删除模组
+
+选中目标卡片，点击 **删除所选模组**，确认文件名后删除。
+
+删除只针对选中的一份文件，不连带删除同名其他版本。删除启用版本后，不会自动启用备用版本。
+
+默认使用 Windows 回收站；如果所在磁盘或目录不支持回收，请留意 Windows 显示的删除提示。
+
+## 游戏运行保护
+
+检测到 `forzahorizon6.exe` 正在运行时，管理器会锁定操作按钮、拖放导入和设置修改，并暂停缩略图生成。游戏退出后恢复操作。
+
+如果进程状态检测失败，程序也会保持锁定，避免在状态不明时更改模组。
+
+## 缓存与空间占用
+
+配置及缓存保存在：
+
+```text
+%LOCALAPPDATA%\FH6CarModManager
+```
+
+- PNG 预览缓存默认限额为 **256 MiB**，超额时优先清理较久未使用的预览。
+- 清理 **30 天未访问**的旧预览；当前新生成的图片受保护。
+- 清理带有管理器所有权标记、超过 **24 小时**的残留临时任务。
+- 错误日志超过 **2 MiB** 时轮换，保留一份旧日志。
+- 命中预览缓存时，不再创建完整车辆 ZIP 的临时副本。
+
+缓存限额不包含渲染过程中使用的临时空间。渲染组件采用独立构建入口，排除完整编辑器的主界面、文档组件与宣传素材，保留模型读取、贴图解码和运行所需依赖。
+
+## 从源码构建
+
+构建环境：
+
+- Windows 10 / 11 x64
+- Python 3.12 x64，包含 Tcl/Tk、pip 和 Python launcher
+- .NET 9 SDK x64
+- Visual Studio 2022 / Build Tools，以及所需 Windows SDK 和桌面应用构建组件
+- 能访问 PyPI 与 NuGet 的网络
+
+完整解压或克隆源码后，关闭游戏与管理器，运行：
+
+```bat
+Build_EXE.bat
+```
+
+构建脚本会执行 Python 测试、打包管理器、编译渲染组件，并检查应用资源及实际 PNG 导出。自检失败时会停止打包。
+
+成功后的输出：
+
+```text
+程序入口：dist\FH6CarModManager\FH6CarModManager.exe
+便携压缩包：dist\FH6CarModManager-win-x64.zip
+体积报告：package-size-report.txt
+```
+
+更多说明见 [Windows 构建指南](WINDOWS_QUICKSTART.md)。
+
+## 常见问题
+
+**为什么提示文件名不匹配？**  
+检查下载文件是否被添加了额外后缀，并确认设置中的校验目录指向当前游戏的 `media\cars`。管理器按完整文件名校验，不会根据车型名称模糊匹配。
+
+**为什么按钮都是灰色的？**  
+先查看侧栏游戏状态。游戏正在运行、进程状态无法确认或文件操作尚未完成时，部分或全部操作会被锁定。
+
+**为什么没有缩略图？**  
+先确认保留了完整的 `renderer` 文件夹，再尝试重建所选缩略图。若某个模组仍失败，可查看：
+
+```text
+%LOCALAPPDATA%\FH6CarModManager\thumbnails\errors.log
+```
+
+**如何反馈问题？**  
+在仓库 Issues 中说明程序版本、Steam / Xbox 版本、复现步骤和错误提示。构建问题可附上 `build-windows.log`、`test-results.log`、`renderer-resources.log` 和 `renderer-check.log` 中实际生成的相关日志。
+
+## 致谢与第三方说明
+
+- [ForzaTech Studio](https://github.com/D3FEKT/ForzaTechStudio)：车辆资源读取与 3D 查看器的基础，本项目使用修改后的独立缩略图构建版本。
+- [HelixToolkit](https://github.com/helix-toolkit/helix-toolkit)：ForzaTech Studio 渲染所使用的图形组件。
+- [Plain Craft Launcher](https://github.com/Meloong-Git/PCL)：蓝白配色与界面布局参考；本工具使用 Tk 独立实现，未引入 PCL 源码或素材。
+
+第三方代码与依赖遵循各自许可证。ForzaTech Studio 的原始许可保留在 [vendor/ForzaTechStudio/LICENSE](vendor/ForzaTechStudio/LICENSE)，修改记录见 [第三方说明](THIRD_PARTY_NOTICES.md)。
+
+本工具为非官方项目，与 Forza、Xbox、ForzaTech Studio 或 PCL 官方无隶属关系。工具不附带游戏车辆资源或车辆模组。
+
+---
+
+**BY：bilibili \_-菠小萝-\_**
