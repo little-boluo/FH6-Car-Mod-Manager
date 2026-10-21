@@ -1,4 +1,4 @@
-# FH6 Car Mod Manager   100%AI
+# FH6 Car Mod Manager
 
 **《极限竞速：地平线 6》车辆模组管理器**
 
