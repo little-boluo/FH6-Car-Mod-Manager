@@ -1,0 +1,36 @@
+﻿<Window
+    x:Class="ForzaTechStudio.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="Base"/>
+    </Window.SystemBackdrop>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TitleBar x:Name="SimpleTitleBar"
+                  Title="ForzaTech Studio">
+        </TitleBar>
+
+        <!-- App content -->
+        <Frame x:Name="RootFrame" Grid.Row="1"/>
+
+        <!-- Invisible focus sink used to end text-entry mode when the user clicks on non-focusable UI. -->
+        <Button x:Name="FocusParkingElement"
+            Grid.Row="1"
+            Width="1"
+            Height="1"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            Opacity="0"
+            IsHitTestVisible="False"
+            UseSystemFocusVisuals="False"/>
+    </Grid>
+    
+</Window>

@@ -1,0 +1,194 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj\FH6ThumbnailRenderer\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>obj\FH6ThumbnailRenderer\</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>ForzaTechStudio</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <!-- Restore the original project's WinUI resource build pipeline. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <EnableCoreMrtTooling>true</EnableCoreMrtTooling>
+    <ProjectPriFileName>resources.pri</ProjectPriFileName>
+    <DisableXbfLineInfo>false</DisableXbfLineInfo>
+    <Nullable>enable</Nullable>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <XamlCompilerOomWorkaround>true</XamlCompilerOomWorkaround>
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN;FH6_THUMBNAIL</DefineConstants>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <EnableDefaultAssets>false</EnableDefaultAssets>
+    <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
+    <AssemblyName>ForzaTech Studio</AssemblyName>
+    <Title>FH6 Thumbnail Renderer</Title>
+    <Description>Dedicated vehicle thumbnail build; no FTS main editor shell</Description>
+    <Version>0.8.1</Version>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <OutputPath>bin\FH6ThumbnailRenderer\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="App.xaml.cs" />
+    <Compile Include="Converters\BlobTypeIconConverter.cs" />
+    <Compile Include="Converters\BoolToVisibilityConverter.cs" />
+    <Compile Include="Converters\BoolToVisibilityIconConverter.cs" />
+    <Compile Include="Converters\BooleanNegationConverter.cs" />
+    <Compile Include="Converters\BooleanToVisibilityConverter.cs" />
+    <Compile Include="Converters\EnumToVisibilityConverter.cs" />
+    <Compile Include="Converters\IntToDoubleConverter.cs" />
+    <Compile Include="Converters\IntToVisibilityConverter.cs" />
+    <Compile Include="Converters\NameHashConverter.cs" />
+    <Compile Include="Converters\NodeTypeIconConverter.cs" />
+    <Compile Include="Converters\NotNullToVisibilityConverter.cs" />
+    <Compile Include="Converters\StatusToColorConverter.cs" />
+    <Compile Include="Converters\StatusToIconConverter.cs" />
+    <Compile Include="Converters\StringToVisibilityConverter.cs" />
+    <Compile Include="Helpers\BlobTemplateSelector.cs" />
+    <Compile Include="Helpers\FileChangeWatcher.cs" />
+    <Compile Include="Helpers\PropertyItemTemplateSelector.cs" />
+    <Compile Include="Helpers\ShaderParameterTemplateSelector.cs" />
+    <Compile Include="Interop\XGImports.cs" />
+    <Compile Include="Interop\XMemCompress.cs" />
+    <Compile Include="Models\AvPinsModel.cs" />
+    <Compile Include="Models\CarbinModels.cs" />
+    <Compile Include="Models\ExportOptions.cs" />
+    <Compile Include="Models\SettingsConfig.cs" />
+    <Compile Include="Models\SwatchbinInfo.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="RendererDiagnostics.cs" />
+    <Compile Include="Services\AclKeyframeDecompressionService.cs" />
+    <Compile Include="Services\AnimationNameTable.cs" />
+    <Compile Include="Services\AvPinsParser.cs" />
+    <Compile Include="Services\BoneTransformService.cs" />
+    <Compile Include="Services\CarbinConversionService.cs" />
+    <Compile Include="Services\ClipdSkeldParserService.cs" />
+    <Compile Include="Services\ConversionOptions.cs" />
+    <Compile Include="Services\ConversionService.cs" />
+    <Compile Include="Services\CustomZipFile.cs" />
+    <Compile Include="Services\FbxExportService.cs" />
+    <Compile Include="Services\FileService.cs" />
+    <Compile Include="Services\ForzaGameCatalog.cs" />
+    <Compile Include="Services\GameAssetDatabaseService.cs" />
+    <Compile Include="Services\GrannyBSplineEvaluator.cs" />
+    <Compile Include="Services\GrannyParserService.cs" />
+    <Compile Include="Services\GsfParserService.cs" />
+    <Compile Include="Services\LightsBinConversionService.cs" />
+    <Compile Include="Services\LightsBinParser.cs" />
+    <Compile Include="Services\LocatorsXmlParser.cs" />
+    <Compile Include="Services\MaterialExtractionService.cs" />
+    <Compile Include="Services\MaterialLibrary.cs" />
+    <Compile Include="Services\MaterialsAndShadersWorkspaceService.cs" />
+    <Compile Include="Services\MiniZipService.cs" />
+    <Compile Include="Services\ModelCarbinConversionService.cs" />
+    <Compile Include="Services\ModelImporter.cs" />
+    <Compile Include="Services\ModelbinConversionService.cs" />
+    <Compile Include="Services\NameHashService.cs" />
+    <Compile Include="Services\ObjExportService.cs" />
+    <Compile Include="Services\OodleCompression.cs" />
+    <Compile Include="Services\PathConversionService.cs" />
+    <Compile Include="Services\PhysicsDefinitionParser.cs" />
+    <Compile Include="Services\SettingsService.cs" />
+    <Compile Include="Services\SwatchbinArchiveService.cs" />
+    <Compile Include="Services\SwatchbinConversionService.cs" />
+    <Compile Include="Services\SwatchbinPreviewService.cs" />
+    <Compile Include="Services\SwatchbinService.cs" />
+    <Compile Include="Services\TextureImageExporter.cs" />
+    <Compile Include="Services\VLayAnalysisDatabaseService.cs" />
+    <Compile Include="Services\VLayLibrary.cs" />
+    <Compile Include="Services\VLayPatternAdvisor.cs" />
+    <Compile Include="Services\ZipArchiveHelper.cs" />
+    <Compile Include="ThumbnailJob.cs" />
+    <Compile Include="ViewModels\FileViewModel.cs" />
+    <Compile Include="ViewModels\LibraryBrowserViewModel.cs" />
+    <Compile Include="ViewModels\MaterialShaderParametersViewModel.cs" />
+    <Compile Include="ViewModels\ModelBinEditorViewModel.cs" />
+    <Compile Include="ViewModels\ShaderParameterViewModel.cs" />
+    <Compile Include="ViewModels\UndoRedoViewModel.cs" />
+    <Compile Include="ViewModels\ViewportViewModel.cs" />
+    <Compile Include="Views\Controls\MaterialParameterEditorView.xaml.cs" />
+    <Compile Include="Views\LibraryBrowserDialog.xaml.cs" />
+    <Compile Include="Views\MaterialShaderParametersPage.xaml.cs" />
+    <Compile Include="Views\SwatchbinCreationDialog.xaml.cs" />
+    <Compile Include="Views\SwatchbinEditorPage.Detiling.cs" />
+    <Compile Include="Views\SwatchbinEditorPage.xaml.cs" />
+    <Compile Include="Views\ViewportPage.Animation.cs" />
+    <Compile Include="Views\ViewportPage.Bones.cs" />
+    <Compile Include="Views\ViewportPage.CarbinRendering.cs" />
+    <Compile Include="Views\ViewportPage.CarbinUI.cs" />
+    <Compile Include="Views\ViewportPage.Export.cs" />
+    <Compile Include="Views\ViewportPage.ExportOptions.cs" />
+    <Compile Include="Views\ViewportPage.FileLoading.cs" />
+    <Compile Include="Views\ViewportPage.FileWatch.cs" />
+    <Compile Include="Views\ViewportPage.Filters.cs" />
+    <Compile Include="Views\ViewportPage.MaterialEditor.cs" />
+    <Compile Include="Views\ViewportPage.MaterialRendering.cs" />
+    <Compile Include="Views\ViewportPage.Overlays.cs" />
+    <Compile Include="Views\ViewportPage.Reload.cs" />
+    <Compile Include="Views\ViewportPage.Rendering.cs" />
+    <Compile Include="Views\ViewportPage.Save.cs" />
+    <Compile Include="Views\ViewportPage.Tabs.cs" />
+    <Compile Include="Views\ViewportPage.TextureBrowser.cs" />
+    <Compile Include="Views\ViewportPage.TextureExport.cs" />
+    <Compile Include="Views\ViewportPage.Thumbnail.cs" />
+    <Compile Include="Views\ViewportPage.TransformHotkeys.cs" />
+    <Compile Include="Views\ViewportPage.Transforms.cs" />
+    <Compile Include="Views\ViewportPage.Tree.cs" />
+    <Compile Include="Views\ViewportPage.UI.cs" />
+    <Compile Include="Views\ViewportPage.UvMaps.cs" />
+    <Compile Include="Views\ViewportPage.xaml.cs" />
+    <Compile Include="Views\ViewportTransformGizmo.cs" />
+    <Compile Include="Views\Controls\StandardPageHeader.xaml.cs" />
+    <Page Include="Views\Controls\StandardPageHeader.xaml"><Generator>MSBuild:Compile</Generator><XamlRuntime>WinUI</XamlRuntime></Page>
+    <ApplicationDefinition Include="App.xaml"><Generator>MSBuild:Compile</Generator><XamlRuntime>WinUI</XamlRuntime></ApplicationDefinition>
+    <Page Include="Views\Controls\MaterialParameterEditorView.xaml"><Generator>MSBuild:Compile</Generator><XamlRuntime>WinUI</XamlRuntime></Page>
+    <Page Include="Views\MaterialShaderParametersPage.xaml"><Generator>MSBuild:Compile</Generator><XamlRuntime>WinUI</XamlRuntime></Page>
+    <Page Include="Views\SwatchbinEditorPage.xaml"><Generator>MSBuild:Compile</Generator><XamlRuntime>WinUI</XamlRuntime></Page>
+    <Page Include="Views\ViewportPage.xaml"><Generator>MSBuild:Compile</Generator><XamlRuntime>WinUI</XamlRuntime></Page>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ForzaTools.Bundles\ForzaTools.Bundles.csproj" />
+    <ProjectReference Include="..\ForzaTools.Shared\ForzaTools.Shared.csproj" />
+    <ProjectReference Include="..\DurangoTypes\DurangoTypes.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="BCnEncoder.Net" Version="2.1.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="HelixToolkit" Version="3.1.2" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.5" />
+    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7175" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.251106002" />
+    <PackageReference Include="SharpCompress" Version="0.42.1" />
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <PackageReference Include="Syroot.BinaryData" Version="5.2.2" />
+    <PackageReference Include="HelixToolkit.WinUI" Version="2.27.3" />
+    <PackageReference Include="SharpDX.Mathematics" Version="4.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Native\xcompress64.dll" Condition="Exists('Native\xcompress64.dll')" TargetPath="xcompress64.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Native\xg.dll" Condition="Exists('Native\xg.dll')" TargetPath="xg.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Native\granny2_x64.dll" Condition="Exists('Native\granny2_x64.dll')" TargetPath="granny2_x64.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Native\forzatech_acl.dll" Condition="Exists('Native\forzatech_acl.dll')" TargetPath="forzatech_acl.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\customcube.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

@@ -1,0 +1,14 @@
+.build-venv/
+.venv/
+__pycache__/
+*.pyc
+*.log
+*.binlog
+/build/
+/dist/
+/renderer/
+**/bin/
+**/obj/
+.vs/
+.env
+/package-size-report.txt
