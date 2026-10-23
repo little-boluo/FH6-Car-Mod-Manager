@@ -84,8 +84,8 @@ Use the sidebar to show **All mods, Enabled, Disabled or Variants**. Search by f
 
 ### 6. 自动缩略图与手动重试 / Automatic previews and retries
 
-程序会为可见的车辆卡片自动生成预览并保存结果，禁用的模组也可以生成缩略图。预览可能与游戏内显示不同；只修改性能参数的模组，图片可能没有区别。  
-The manager automatically generates and saves previews for visible vehicle cards, including disabled mods. Previews may differ from the in-game appearance. Mods that only change performance settings may look identical.
+程序会为可见的车辆卡片自动生成预览并保存结果，禁用的模组也可以生成缩略图。预览可能与游戏内显示不同。  
+The manager automatically generates and saves previews for visible vehicle cards, including disabled mods. Previews may differ from the in-game appearance.
 
 生成失败后会显示 **预览失败 · 手动重试 / Preview failed · Retry manually**。重启管理器不会反复尝试。选中车辆并点击 **重建所选缩略图 / Rebuild preview**，可手动重试，仅影响所选模组。  
 After a failure, the card displays **Preview failed · Retry manually**. Restarting the manager does not repeatedly retry it. Select the vehicle and click **Rebuild preview** to retry only that mod.
