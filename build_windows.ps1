@@ -13,6 +13,8 @@ try {
     }
     if ($LASTEXITCODE -ne 0) { throw 'Could not create Python build environment.' }
     $pythonExe = Join-Path $PSScriptRoot '.build-venv\Scripts\python.exe'
+    & $pythonExe (Join-Path $PSScriptRoot 'build_checks.py') sources
+    if ($LASTEXITCODE -ne 0) { throw 'Source package incomplete. Download and extract the complete ZIP into a new folder.' }
     & $pythonExe (Join-Path $PSScriptRoot 'build_checks.py') validate
     if ($LASTEXITCODE -ne 0) { throw 'Python/Tk validation failed.' }
     & $pythonExe -m pip install --disable-pip-version-check -r requirements-build.txt

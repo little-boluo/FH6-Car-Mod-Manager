@@ -7,6 +7,22 @@ import sys
 import unittest
 
 
+def validate_sources(root=None):
+    """Detect incomplete extraction before dependencies, tests or compilation."""
+    root = Path(root) if root is not None else Path(__file__).resolve().parent
+    manifest = root / 'SOURCE_FILES.txt'
+    if not manifest.is_file():
+        raise RuntimeError('Source package incomplete: SOURCE_FILES.txt is missing. Download and extract the complete ZIP into a new folder.')
+    names = [line.strip() for line in manifest.read_text(encoding='utf-8').splitlines() if line.strip()]
+    if not names:
+        raise RuntimeError('Source package incomplete: SOURCE_FILES.txt is empty.')
+    missing = [name for name in names if not (root / name).is_file()]
+    if missing:
+        raise RuntimeError('Source package incomplete. Missing files:\n  ' + '\n  '.join(missing)
+                           + '\nDownload and extract the complete ZIP into a new folder; do not skip tests.')
+    print(f'Source file inventory: OK ({len(names)} files)')
+
+
 def validate_environment():
     if sys.version_info < (3, 10) or struct.calcsize('P') != 8:
         raise RuntimeError('64-bit Python 3.10 or newer is required.')
@@ -24,6 +40,7 @@ def smoke_test(executable):
 
 def run_tests():
     root = Path(__file__).resolve().parent
+    validate_sources(root)
     log_path = root / 'test-results.log'
     suite = unittest.defaultTestLoader.discover(str(root / 'tests'))
     # Persist every failure before printing: PowerShell 5 transcripts can omit
@@ -66,13 +83,15 @@ def renderer_test(executable):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('validate', 'smoke', 'tests', 'renderer', 'resources'))
+    parser.add_argument('mode', choices=('sources', 'validate', 'smoke', 'tests', 'renderer', 'resources'))
     parser.add_argument('executable', nargs='?')
     args = parser.parse_args()
     if args.mode in ('smoke', 'renderer', 'resources') and not args.executable:
         parser.error('This check requires an executable path')
     try:
-        if args.mode == 'validate':
+        if args.mode == 'sources':
+            validate_sources()
+        elif args.mode == 'validate':
             validate_environment()
         elif args.mode == 'tests':
             return 0 if run_tests() else 1

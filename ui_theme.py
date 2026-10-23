@@ -2,6 +2,8 @@
 import tkinter as tk
 from tkinter import ttk
 
+from animation import Animator, lerp_color
+
 BG = '#eaf1f9'
 PANEL = '#ffffff'
 TEXT = '#344559'
@@ -29,6 +31,10 @@ class Card(tk.Frame):
         self.surface.bind('<Configure>', self._paint)
 
     def _paint(self, event):
+        size = (event.width, event.height)
+        if size == getattr(self, '_painted_size', None):
+            return  # moved but not resized, e.g. during a page slide
+        self._painted_size = size
         c = self.surface
         c.delete('all')
         rounded_rect(c, 1, 3, event.width-1, event.height-1, fill='#dce6f2', outline='')
@@ -123,16 +129,23 @@ def setup_style(root):
 
 
 class RoundedNavButton(tk.Canvas):
-    """Draw the text and rounded surface together; no ttk image padding can clip it."""
+    """Draw the text and rounded surface together; no ttk image padding can clip it.
+
+    Hover, press and selected-state changes are tweened rather than switched."""
+    HOVER_FILL, PRESS_FILL = '#dceeff', '#c3e0ff'
+
     def __init__(self, parent, text, command, **kwargs):
         from tkinter import font
         self.text, self.command = text, command
         self.text_font = font.Font(family='Microsoft YaHei UI', size=11)
         self.fill, self.foreground, self.button_state = ACCENT, PANEL, 'normal'
-        self.hover = False
+        self.colors_from = (self.fill, self.foreground)
         super().__init__(parent, width=max(94, self.text_font.measure(text)+36),
                          height=self.text_font.metrics('linespace')+22, bg=ACCENT,
                          highlightthickness=0, borderwidth=0, takefocus=True, cursor='hand2')
+        self.anim = Animator(self, self._paint)
+        for key, value in (('hover', 0.0), ('press', 0.0), ('swap', 1.0)):
+            self.anim.set(key, value)
         self.bind('<Configure>', lambda e: self._paint())
         self.bind('<Enter>', lambda e: self._hover(True))
         self.bind('<Leave>', lambda e: self._hover(False))
@@ -142,19 +155,24 @@ class RoundedNavButton(tk.Canvas):
         self.bind('<space>', lambda e: self.invoke())
         self.bind('<FocusIn>', lambda e: self._paint())
         self.bind('<FocusOut>', lambda e: self._paint())
+        self.bind('<Destroy>', lambda e: self.anim.stop() if e.widget is self else None)
         self.pressed = False
 
     def _hover(self, value):
-        self.hover = value
-        self._paint()
+        self.anim.to('hover', 1.0 if value else 0.0, 150)
+        if not value:
+            self.pressed = False
+            self.anim.to('press', 0.0, 120)
 
     def _press(self, event):
         if self.button_state != 'disabled':
             self.focus_set()
             self.pressed = True
+            self.anim.to('press', 1.0, 70)
 
     def _release(self, event):
         pressed, self.pressed = self.pressed, False
+        self.anim.to('press', 0.0, 180)
         if pressed and 0 <= event.x < self.winfo_width() and 0 <= event.y < self.winfo_height():
             self.invoke()
 
@@ -163,8 +181,14 @@ class RoundedNavButton(tk.Canvas):
             self.command()
         return 'break'
 
+    def _base_colors(self):
+        swap = self.anim.get('swap', 1.0)
+        return (lerp_color(self.colors_from[0], self.fill, swap),
+                lerp_color(self.colors_from[1], self.foreground, swap))
+
     def configure(self, cnf=None, **kwargs):
         if cnf: kwargs.update(cnf)
+        before = self._base_colors()
         for key, value in list(kwargs.items()):
             if key == 'text': self.text = kwargs.pop(key)
             elif key == 'bg': self.fill = kwargs.pop(key)
@@ -172,6 +196,11 @@ class RoundedNavButton(tk.Canvas):
             elif key == 'state': self.button_state = kwargs.pop(key)
             elif key in ('activebackground', 'activeforeground', 'disabledforeground'): kwargs.pop(key)
         if kwargs: super().configure(**kwargs)
+        if (self.fill, self.foreground) != before:
+            # Cross-fade from what is currently on screen; snap before the first paint.
+            self.colors_from = before
+            self.anim.set('swap', 0.0)
+            self.anim.to('swap', 1.0, 200) if self.winfo_ismapped() else self.anim.set('swap', 1.0)
         self._paint()
 
     config = configure
@@ -184,10 +213,23 @@ class RoundedNavButton(tk.Canvas):
         return super().cget(key)
 
     def _paint(self):
-        self.delete('all')
-        disabled = self.button_state == 'disabled'
-        fill = '#edf1f5' if disabled else '#dceeff' if self.hover else self.fill
-        fg = '#8794a5' if disabled else ACCENT if self.hover else self.foreground
-        rounded_rect(self, 1, 1, max(2,self.winfo_width()-1), max(2,self.winfo_height()-1), radius=12,
-                     fill=fill, outline='#91c5ff' if self.focus_get() == self else fill, width=2)
-        self.create_text(self.winfo_width()/2, self.winfo_height()/2, text=self.text, fill=fg, font=self.text_font)
+        if self.button_state == 'disabled':
+            fill, fg = '#edf1f5', '#8794a5'
+        else:
+            hover, press = self.anim.get('hover'), self.anim.get('press')
+            fill, fg = self._base_colors()
+            fill = lerp_color(lerp_color(fill, self.HOVER_FILL, hover), self.PRESS_FILL, press)
+            fg = lerp_color(fg, ACCENT, hover)
+        width, height = max(2, self.winfo_width()-1), max(2, self.winfo_height()-1)
+        r = min(12, (width-1)/2, (height-1)/2)
+        points = (1+r, 1, width-r, 1, width, 1, width, 1+r,
+                  width, height-r, width, height, width-r, height, 1+r, height,
+                  1, height, 1, height-r, 1, 1+r, 1, 1)
+        if not hasattr(self, '_surface_item'):
+            self._surface_item = self.create_polygon(*points, smooth=True, splinesteps=24, width=2)
+            self._text_item = self.create_text(0, 0, font=self.text_font)
+        self.coords(self._surface_item, *points)
+        self.itemconfigure(self._surface_item, fill=fill,
+                           outline='#91c5ff' if self.focus_get() == self else fill)
+        self.coords(self._text_item, self.winfo_width()/2, self.winfo_height()/2 + self.anim.get('press'))
+        self.itemconfigure(self._text_item, text=self.text, fill=fg)

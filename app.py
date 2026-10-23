@@ -17,6 +17,9 @@ from process_watch import game_is_running
 from windows_drop import WindowsDrop
 from mod_grid import ModGrid
 from thumbnails import ThumbnailService
+import animation
+from animation import Animator
+from motion_widgets import MotionProgress, DropHighlight
 import i18n
 from i18n import t
 
@@ -40,6 +43,8 @@ class Application:
         self.startup_detection_pending = True
         self.drop = None
         self.jobs = queue.Queue()
+        self.progress_events = queue.Queue()
+        self.removing = None
         self.rows = {}
         self.config = {}
         self.buttons = []
@@ -54,7 +59,8 @@ class Application:
             except (OSError, ValueError):
                 pass
         i18n.set_language(self.config.get('language', 'zh'))
-        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.2'))
+        animation.set_enabled(self.config.get('animations', True))  # set "animations": false in settings.json to disable
+        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.3'))
         root.geometry(f'1440x{min(960, max(700, root.winfo_screenheight()-80))}')
         root.minsize(1050, 670)
         root.configure(bg=BG)
@@ -85,6 +91,8 @@ class Application:
 
     def build(self):
         self.page = 'mods'
+        self.page_anim = Animator(self.root, self._slide_frame)
+        self.slide_page = None
         self.view_filter = 'all'
         self.folder = tk.StringVar(value=t('尚未定位 mediapc\\Cars'))
         self.location_info = tk.StringVar(value=t('正在检测游戏目录'))
@@ -99,7 +107,7 @@ class Application:
         header.pack_propagate(False)
         tk.Label(header, text='FH6', font=('Segoe UI', 22, 'bold'), bg=ACCENT, fg='white').pack(side='left', padx=(24, 12))
         tk.Label(header, text=t('车辆模组管理器'), font=('Microsoft YaHei UI', 11), bg=ACCENT, fg='#e1efff').pack(side='left')
-        tk.Label(header, text='v0.8.2', bg=ACCENT, fg='#d6e9ff', font=('Segoe UI', 10)).pack(side='right', padx=24)
+        tk.Label(header, text='v0.8.3', bg=ACCENT, fg='#d6e9ff', font=('Segoe UI', 10)).pack(side='right', padx=24)
         navigation = tk.Frame(header, bg=ACCENT)
         navigation.pack(side='right', padx=24)
         self.page_buttons = {}
@@ -120,10 +128,10 @@ class Application:
                                          style='Muted.TLabel', font=('Microsoft YaHei UI', 10, 'bold'))
         self.signature_label.place(relx=.5, rely=.5, anchor='center')
         ttk.Label(footer, text='STEAM  /  XBOX', style='Muted.TLabel', font=('Segoe UI', 9)).pack(side='right')
-        progress_host = ttk.Frame(self.root, height=3)
+        progress_host = ttk.Frame(self.root, height=4)
         progress_host.pack(side='bottom', fill='x')
         progress_host.pack_propagate(False)
-        self.progress = ttk.Progressbar(progress_host, mode='indeterminate')
+        self.progress = MotionProgress(progress_host)
         self.progress.pack(fill='both', expand=True)
 
         body = ttk.Frame(self.root)
@@ -148,12 +156,12 @@ class Application:
         self.game_label = ttk.Label(bottom, textvariable=self.game_status, style='CardMuted.TLabel', wraplength=176)
         self.game_label.pack(anchor='w', pady=(6, 0))
 
-        self.page_host = ttk.Frame(body, padding=(22, 20))
+        self.page_host = ttk.Frame(body)
         self.page_host.pack(fill='both', expand=True)
         self.pages = {'mods': ttk.Frame(self.page_host),
                       'settings': ScrollPage(self.page_host), 'help': ScrollPage(self.page_host)}
         mods = self.pages['mods']
-        mods.pack(fill='both', expand=True)
+        mods.place(x=22, y=20, relwidth=1, width=-44, relheight=1, height=-40)
         heading = ttk.Frame(mods)
         heading.pack(fill='x', pady=(0, 14))
         self.page_title = tk.StringVar(value=t('全部模组'))
@@ -164,6 +172,8 @@ class Application:
         ttk.Label(summary.body, textvariable=self.stats, style='CardMuted.TLabel', wraplength=1000).pack(anchor='w', pady=(0, 12))
         summary_row = ttk.Frame(summary.body, style='Card.TFrame')
         summary_row.pack(fill='x')
+        summary_row.configure(height=62)
+        summary_row.pack_propagate(False)
         self.search = tk.StringVar()
         self.search_entry = ttk.Entry(summary_row, textvariable=self.search, width=24)
         self.search_entry.pack(side='right')
@@ -172,6 +182,7 @@ class Application:
         self.drop_title = tk.Label(summary_row, text=t('将车辆 ZIP 拖入此窗口，即可安装'), bg=PANEL, fg=TEXT,
                                    font=('Microsoft YaHei UI', 10), anchor='w', wraplength=400, justify='left')
         self.drop_title.pack(side='left', fill='x', expand=True)
+        self.drop_highlight = DropHighlight(summary_row)
 
         actions = Card(mods, padding=14)
         actions.pack(side='bottom', fill='x', pady=(14, 0))
@@ -266,11 +277,12 @@ class Application:
         selection = self.tree.selection()
         self.config = settings
         i18n.set_language(language)
+        self.page_anim.stop()
         for child in list(self.root.winfo_children()):
             child.destroy()
         self.buttons = []
         self.build()
-        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.2'))
+        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.3'))
         if self.manager:
             self.folder.set(str(self.manager.folder))
             self.show_vehicle_directory()
@@ -282,17 +294,50 @@ class Application:
         self.show_page(page)
         self.apply_game_state(self.game_running, self.game_error)
 
+    PAGE_ORDER = ('mods', 'settings', 'help')
+    PAGE_PAD = (22, 20)
+    SLIDE_PX = 22
+
     def show_page(self, key):
-        if self.locked():
+        if self.locked() or key not in self.pages:
             return
-        for page in self.pages.values():
-            page.pack_forget()
-        self.pages[key].pack(fill='both', expand=True)
+        previous = self.page
+        if previous == key:
+            # Clicking the selected tab must not unmap/remap its native children.
+            return
+        self.page_anim.cancel('slide')
+        old, page = self.pages[previous], self.pages[key]
+        px, py = self.PAGE_PAD
+        old.place_configure(x=px, y=py)
+        for name, other in self.pages.items():
+            if name not in (previous, key):
+                other.place_forget()
         self.page = key
         for name, button in self.page_buttons.items():
             self.style_navigation(button, name == key)
+        direction = 1 if self.PAGE_ORDER.index(key) > self.PAGE_ORDER.index(previous) else -1
+        offset = direction * self.SLIDE_PX if animation.ENABLED else 0
+        self.slide_page = page
+        # Retain the outgoing page underneath until the incoming page is painted.
+        # Geometry and size stay identical throughout and after the transition.
+        page.place(x=px + offset, y=py, relwidth=1, width=-2*px, relheight=1, height=-2*py)
+        page.tkraise()
+        self.page_anim.to('slide', 0.0, 240, start=offset, done=lambda: self._slide_done(page))
         if key == 'mods':
             self.tree.redraw()
+
+    def _slide_frame(self):
+        page = self.slide_page
+        if page is not None and page.winfo_exists():
+            page.place_configure(x=self.PAGE_PAD[0] + round(self.page_anim.get('slide')))
+
+    def _slide_done(self, page):
+        if page.winfo_exists() and page is self.pages.get(self.page):
+            page.place_configure(x=self.PAGE_PAD[0])
+            for other in self.pages.values():
+                if other is not page:
+                    other.place_forget()
+            self.slide_page = None
 
     def set_filter(self, key):
         if self.locked():
@@ -307,17 +352,28 @@ class Application:
 
     def init_drop(self):
         try:
-            self.drop = WindowsDrop(self.root, self.on_drop)
+            self.drop = WindowsDrop(self.root, self.on_drop, self.on_drag)
         except Exception as exc:
             self.drop_title.configure(text=t('点击「导入 ZIP」安装车辆模组'))
             self.log(exc)
         self.apply_controls()
+
+    def on_drag(self, active, accepted=False, count=0):
+        if not hasattr(self, 'drop_highlight'):
+            return
+        if active and not self.locked():
+            self.show_page('mods')
+            self.drop_highlight.show(accepted, count)
+        else:
+            self.drop_highlight.hide(immediate=self.locked())
 
     def locked(self):
         return self.busy or self.game_running is not False
 
     def apply_controls(self):
         locked = self.locked()
+        if locked and hasattr(self, 'drop_highlight'):
+            self.drop_highlight.hide(immediate=True)
         self.buttons = [b for b in self.buttons if b.winfo_exists()]
         for b in self.buttons:
             b.configure(state='disabled' if locked else 'normal')
@@ -393,10 +449,11 @@ class Application:
         self.log(exc)
         messagebox.showerror(t('操作未完成'), str(exc), parent=self.root)
 
-    def run(self, label, fn, callback=None):
+    def run(self, label, fn, callback=None, *, remove=None):
         if not self.can_edit():
             return
         self.busy = True
+        self.removing = remove
         self.status.set(label + '…')
         self.progress.start(12)
         self.apply_controls()
@@ -407,31 +464,58 @@ class Application:
                 self.jobs.put((exc, None, callback))
         threading.Thread(target=work, daemon=False).start()
 
+    def report_import_progress(self, done, total, name, index, count, phase):
+        # Worker thread only enqueues plain data; all Tk work stays in poll().
+        self.progress_events.put((done / max(1, total), name, index, count, phase))
+
     def poll(self):
         if hasattr(self, 'thumbnails') and self.thumbnails.drain():
             self.tree.redraw()
+        latest = None
+        if hasattr(self, 'progress_events'):
+            while True:
+                try:
+                    latest = self.progress_events.get_nowait()
+                except queue.Empty:
+                    break
+        if latest and self.busy:
+            fraction, name, index, count, phase = latest
+            self.progress.report(fraction)
+            phase_text = {'hash': t('校验源文件'), 'copy': t('复制文件'),
+                          'verify': t('验证完整性'), 'done': t('已处理')}.get(phase, phase)
+            self.status.set(t('导入 {0}/{1} · {2} · {3}% · {4}').format(
+                index, count, phase_text, round(fraction*100), name))
         try:
             exc, result, callback = self.jobs.get_nowait()
         except queue.Empty:
             pass
         else:
-            self.busy = False
-            self.progress.stop()
-            self.probe_game()
-            self.status.set(t('操作未完成，请查看提示') if exc else t('就绪 · 请在游戏关闭时管理模组'))
-            self.refresh()
-            if exc:
-                self.error(exc)
-            elif callback:
-                try:
-                    callback(result)
-                except Exception as callback_error:
-                    self.error(callback_error)
-            self.apply_controls()
-            if self.pending_drops and not self.locked():
-                paths, self.pending_drops = self.pending_drops, []
-                self.root.after(100, lambda: self.on_drop(paths))
-        self.root.after(100, self.poll)
+            removing = getattr(self, 'removing', None)
+            self.removing = None
+            if not exc and removing:
+                # Show disappearance only after the real recycle/delete succeeds.
+                self.tree.animate_remove(removing, lambda: self._finish_job(exc, result, callback))
+            else:
+                self._finish_job(exc, result, callback)
+        self.root.after(50, self.poll)
+
+    def _finish_job(self, exc, result, callback):
+        self.busy = False
+        self.progress.finish(not exc and not (isinstance(result, dict) and result.get('errors')))
+        self.probe_game()
+        self.status.set(t('操作未完成，请查看提示') if exc else t('就绪 · 请在游戏关闭时管理模组'))
+        self.refresh()
+        if exc:
+            self.error(exc)
+        elif callback:
+            try:
+                callback(result)
+            except Exception as callback_error:
+                self.error(callback_error)
+        self.apply_controls()
+        if self.pending_drops and not self.locked():
+            paths, self.pending_drops = self.pending_drops, []
+            self.root.after(100, lambda: self.on_drop(paths))
 
     def set_folder(self, folder, exe='', manual=False):
         if not self.can_edit():
@@ -583,7 +667,7 @@ class Application:
         if self.busy:
             return
         old = self.tree.selection()
-        self.tree.delete(*self.tree.get_children())
+        entries = []
         term = self.search.get().strip().casefold()
         counts = Counter(r.group for r in self.rows.values())
         active_counts = Counter(r.group for r in self.rows.values() if r.enabled)
@@ -597,11 +681,11 @@ class Application:
                 continue
             if term and term not in r.filename.casefold():
                 continue
-            self.tree.insert('', 'end', iid=r.filename,
-                values=(t('● 已启用') if r.enabled else t('○ 已禁用'), r.base,
+            entries.append((r.filename, (t('● 已启用') if r.enabled else t('○ 已禁用'), r.base,
                         (t('备用位 ') + str(r.variant)) if r.variant else t('原始名称'),
                         r.filename, size_text(r.size), datetime.fromtimestamp(r.modified).strftime('%Y-%m-%d %H:%M')),
-                tags=('enabled' if r.enabled else 'disabled',))
+                ('enabled' if r.enabled else 'disabled',)))
+        self.tree.replace(entries)
         if old and self.tree.exists(old[0]):
             self.tree.selection_set(old[0])
         elif self.tree.get_children():
@@ -711,7 +795,7 @@ class Application:
             return
         self.run(t('正在删除所选模组'),
                  lambda: self.guard_game(lambda: self.manager.delete(filename, expected=(m.size, m.modified))),
-                 lambda name: self.status.set(t('已删除：') + name))
+                 lambda name: self.status.set(t('已删除：') + name), remove=filename)
 
     def choose_import(self):
         if not self.can_edit():
@@ -721,6 +805,7 @@ class Application:
             self.on_drop(list(paths))
 
     def on_drop(self, paths):
+        self.on_drag(False)
         if not paths:
             return
         self.probe_game()
@@ -735,7 +820,7 @@ class Application:
             return
         if not self.ensure_vehicle_directory():
             return
-        self.run(t('正在导入 {0} 个 ZIP').format(len(paths)), lambda: self.guard_game(lambda: self.manager.import_files(paths)), self.imported)
+        self.run(t('正在导入 {0} 个 ZIP').format(len(paths)), lambda: self.guard_game(lambda: self.manager.import_files(paths, progress=self.report_import_progress)), self.imported)
 
     def imported(self, result):
         n = len(result['imported'])
@@ -768,6 +853,7 @@ class Application:
         if self.drop:
             self.drop.close()
         self.thumbnails.close()
+        self.page_anim.stop()
         self.root.destroy()
 
 

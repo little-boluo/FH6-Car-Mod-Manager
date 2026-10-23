@@ -12,6 +12,7 @@ import shutil
 import stat
 import tempfile
 import uuid
+from time import monotonic
 
 SUFFIX = re.compile(r'^(.*)__fh6mm_v([1-9][0-9]*)$', re.I)
 
@@ -20,11 +21,13 @@ class ModError(Exception):
     pass
 
 
-def sha256(path):
+def sha256(path, progress=None):
     h = hashlib.sha256()
     with open(path, 'rb') as f:
         for block in iter(lambda: f.read(1024 * 1024), b''):
             h.update(block)
+            if progress:
+                progress(len(block))
     return h.hexdigest()
 
 
@@ -347,13 +350,36 @@ class Manager:
                 raise ModError(t('删除未完成，文件仍在原目录。'))
             return m.filename
 
-    def import_files(self, paths):
+    def import_files(self, paths, progress=None):
+        paths = list(paths)
         result = {'imported': [], 'skipped': [], 'errors': []}
         # Reload every batch; the base game's car list can change after updates.
         catalog = self.vehicle_catalog()
+        weights = []
+        for raw in paths:
+            try:
+                weights.append(max(1, Path(raw).stat().st_size) * 3)
+            except OSError:
+                weights.append(3)
+        total, completed = sum(weights), 0
+        last_report = 0.0
+        def notify(value, name, index, phase, force=False):
+            nonlocal last_report
+            now = monotonic()
+            if progress and (force or now-last_report >= .04):
+                progress(value, total, name, index, len(paths), phase)
+                last_report = now
         with self.mutation():
-            for raw in paths:
+            for index, raw in enumerate(paths, 1):
                 source = Path(raw).absolute()
+                file_weight = weights[index-1]
+                phase_bytes = 0
+                def advance(amount):
+                    nonlocal phase_bytes
+                    phase_bytes += amount
+                    notify(completed + min(file_weight-1, phase_bytes), source.name, index, phase)
+                phase = 'hash'
+                notify(completed, source.name, index, phase, True)
                 try:
                     valid_name(source.name)
                     if source.suffix.casefold() != '.zip' or not regular(source):
@@ -380,16 +406,26 @@ class Manager:
                     if shutil.disk_usage(self.folder).free < source.stat().st_size:
                         raise ModError(t('目标磁盘空间不足。'))
                     before = source.stat()
-                    source_hash = sha256(source)
+                    source_hash = sha256(source, advance) if progress else sha256(source)
                     fd, temp_name = tempfile.mkstemp(prefix='.fh6mm-import-', suffix='.tmp', dir=self.folder)
                     temp = Path(temp_name)
                     try:
                         with os.fdopen(fd, 'wb') as out, source.open('rb') as inp:
-                            shutil.copyfileobj(inp, out, 1024 * 1024)
+                            phase = 'copy'
+                            notify(completed + phase_bytes, source.name, index, phase, True)
+                            if progress:
+                                for block in iter(lambda: inp.read(1024 * 1024), b''):
+                                    out.write(block)
+                                    advance(len(block))
+                            else:
+                                shutil.copyfileobj(inp, out, 1024 * 1024)
                             out.flush()
                             os.fsync(out.fileno())
                         after = source.stat()
-                        if sha256(temp) != source_hash or (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+                        phase = 'verify'
+                        notify(completed + phase_bytes, source.name, index, phase, True)
+                        copied_hash = sha256(temp, advance) if progress else sha256(temp)
+                        if copied_hash != source_hash or (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
                             raise ModError(t('复制时源文件发生变化，已取消本文件导入。'))
                         shutil.copystat(source, temp)
                         self.move(temp, self.path(dest_name))
@@ -398,4 +434,7 @@ class Manager:
                     result['imported'].append(dest_name)
                 except (OSError, ModError) as exc:
                     result['errors'].append(source.name + '：' + str(exc))
+                finally:
+                    completed += file_weight
+                    notify(completed, source.name, index, 'done', True)
         return result

@@ -12,7 +12,16 @@ def t(message):
 
 
 EN = {
-    'FH6 Car Mod Manager · 车辆模组管理器 0.8.2': 'FH6 Car Mod Manager 0.8.2',
+    '松开以导入 {0} 个 ZIP': 'Release to import {0} ZIP file(s)',
+    '请拖入实际的车辆 ZIP 文件': 'Drop vehicle ZIP files here',
+    '文件名将在安装前校验，原文件保持不变': 'Names are checked before installation; source files are preserved',
+    '校验源文件': 'Checking source',
+    '复制文件': 'Copying',
+    '验证完整性': 'Verifying',
+    '已处理': 'Processed',
+    '导入 {0}/{1} · {2} · {3}% · {4}': 'Import {0}/{1} · {2} · {3}% · {4}',
+
+    'FH6 Car Mod Manager · 车辆模组管理器 0.8.3': 'FH6 Car Mod Manager 0.8.3',
     '上次使用的模组目录 · 运行状态检测中': 'Last mod folder · Checking game status',
     '尚未定位 mediapc\\Cars': 'mediapc\\Cars not located',
     '正在检测游戏目录': 'Locating the game folder',

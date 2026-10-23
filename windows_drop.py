@@ -4,7 +4,7 @@ import os
 import queue
 
 
-class WindowsDrop:
+class LegacyWindowsDrop:
     def __init__(self, root, callback):
         if os.name != 'nt':
             raise OSError(t('窗口拖放仅支持 Windows。'))
@@ -12,6 +12,7 @@ class WindowsDrop:
         from ctypes import wintypes as w
         self.root, self.callback, self.events = root, callback, queue.Queue()
         self.closed = False
+        self.enabled = True
         self.c = c
         self.user = c.WinDLL('user32', use_last_error=True)
         self.shell = c.WinDLL('shell32', use_last_error=True)
@@ -50,7 +51,8 @@ class WindowsDrop:
                     buf = self.c.create_unicode_buffer(size + 1)
                     self.shell.DragQueryFileW(wp, i, buf, size + 1)
                     paths.append(buf.value)
-                self.events.put(paths)
+                if self.enabled:
+                    self.events.put(paths)
             except Exception:
                 self.events.put([])
             finally:
@@ -69,7 +71,8 @@ class WindowsDrop:
         except queue.Empty:
             pass
         else:
-            self.callback(paths)
+            if self.enabled:
+                self.callback(paths)
         self.root.after(100, self.poll)
 
     def close(self):
@@ -79,5 +82,30 @@ class WindowsDrop:
             self.closed = True
 
     def set_enabled(self, enabled):
+        self.enabled = bool(enabled)
+        if not self.enabled:
+            while True:
+                try:
+                    self.events.get_nowait()
+                except queue.Empty:
+                    break
         if not self.closed:
             self.shell.DragAcceptFiles(self.hwnd, bool(enabled))
+
+
+class WindowsDrop:
+    """Prefer OLE hover feedback, retain WM_DROPFILES as a compatibility fallback."""
+    def __init__(self, root, callback, on_drag=None):
+        if os.name != 'nt':
+            raise OSError(t('窗口拖放仅支持 Windows。'))
+        from windows_ole_drop import OleDrop
+        try:
+            self.backend = OleDrop(root, callback, on_drag)
+        except OSError:
+            self.backend = LegacyWindowsDrop(root, callback)
+
+    def set_enabled(self, enabled):
+        self.backend.set_enabled(enabled)
+
+    def close(self):
+        self.backend.close()
