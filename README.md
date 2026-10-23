@@ -1,264 +1,197 @@
 # FH6 Car Mod Manager
 
-**《极限竞速：地平线 6》车辆模组管理器 · v0.8.4**
+**《极限竞速：地平线 6》车辆模组管理器 · v0.8.4**  
+**Forza Horizon 6 Car Mod Manager · v0.8.4**
 
-将车辆模组的导入、启用、切换和删除集中到一个窗口中。通过车辆缩略图和宫格界面，直观区分不同模组及同一辆车的多个版本，减少反复打开游戏文件夹、手动修改文件名的操作。
+在一个窗口中导入、启用、切换和删除车辆模组，通过缩略图宫格区分不同车辆及同名模组版本。  
+Import, enable, switch and delete car mods in one window. Thumbnail cards help you distinguish vehicles and different versions of the same mod.
 
-**支持 Steam / Xbox 版 · 简体中文 / English · Windows 10 / 11 x64**
+**支持 Steam / Xbox 版 · 简体中文 / English · Windows 10 / 11 x64**  
+**Supports Steam and Xbox editions · Simplified Chinese / English · Windows 10 / 11 x64**
 
 **BY：bilibili \_-菠小萝-\_**
 
-## v0.8.4 手动导入缩略图
+## 使用方法 / How to use
 
-选中一张车辆卡片，点击底部的 **导入缩略图**，选择图片即可替换这个模组的预览。
+### 1. 下载与启动 / Download and launch
 
-- 支持 **PNG、JPG / JPEG、WebP、BMP**；动画图片使用第一帧。
-- 自动校正照片方向，等比例缩放并居中留边，不拉伸、不裁切车身。透明部分使用预览区背景色。
-- 图片保存为一张 684 × 384 的 PNG，不修改所选图片或车辆 ZIP。
-- 手动图片优先显示；即使自动渲染失败或未安装 3D 渲染器，也可以使用。
-- 每个模组文件单独保存，启用、禁用和同名版本改名后仍跟随对应文件；相同内容的另一个文件不会一起换图。重启后继续保留。
-- 再次导入可替换手动图片。点击 **重建所选缩略图** 会移除该模组的手动图片并尝试自动生成；若没有渲染器或渲染失败，显示相应提示。
-- 游戏运行或正在处理文件时，导入按钮同样锁定。取消选择或导入失败会保留原有图片。
+1. 在仓库的 **Releases** 页面下载适用于 Windows 的程序压缩包。  
+   Download the Windows application ZIP from the repository’s **Releases** page.
+2. 完整解压到一个可写的文件夹。  
+   Extract the entire ZIP into a writable folder.
+3. 关闭游戏，运行 `FH6CarModManager.exe`。  
+   Close the game and launch `FH6CarModManager.exe`.
 
-手动图片位于 `%LOCALAPPDATA%\FH6CarModManager\thumbnails\manual`，不参与自动预览缓存的过期或容量清理。若模组被删除或内容被替换，旧手动图片可能仍留在此目录；关闭管理器后可手动清理，不影响车辆 ZIP。更换模组内容或重新复制成另一个文件时，需要重新指定图片。
+请保留程序文件夹中的全部文件，不要只移动 EXE，也不要直接在压缩包内运行。  
+Keep all files in the application folder. Do not move only the EXE or run it directly from inside the ZIP.
 
-源码运行需先执行 `python -m pip install -r requirements.txt`。`Build_EXE.bat` 会自动安装图片处理依赖 Pillow，打包后的便携版无需额外安装。
+### 2. 确认游戏目录 / Confirm the game folders
 
-**English:** Select a vehicle card and click **Import preview**. PNG, JPEG, WebP and BMP are supported. Custom pictures stay with the selected mod through enable/disable and variant renames, and take priority over automatic previews. **Rebuild preview** removes the custom picture and requests automatic rendering.
+程序会自动查找 `forzahorizon6.exe`，区分 Steam 与 Xbox 的目录结构，并在需要时创建模组文件夹。识别完成后，已有模组会直接显示在宫格中。  
+The manager automatically looks for `forzahorizon6.exe`, identifies the Steam or Xbox folder layout, and creates the mod folder if needed. Existing mods then appear in the grid.
 
-## v0.8.3-fix1 构建包修复
-
-重新提供完整源码包，补齐 Windows 拖放和回收站模块。构建前新增文件清单检查；若解压不完整，将直接列出缺失文件并停止，不跳过测试。管理器功能版本仍为 v0.8.3。请解压到新文件夹，再运行 `Build_EXE.bat`。
-
-## v0.8.3 更新说明
-
-优化页面切换与卡片交互，让操作过程更连贯。
-
-- **页面切换更自然**：参考 PCL2 的短距离缓动节奏，切换完成后保持页面布局不变，修复动画结束时重新布局引起的闪烁；连续点击会接续到最后选择的页面。
-- **卡片刷新更稳定**：复用已有卡片和导航绘图对象，避免每帧清空后重画；保留悬停、选中和启用状态的过渡。
-- **拖入 ZIP 高亮**：将车辆 ZIP 拖入窗口时显示蓝色提示及文件数量，移出后提示淡出。非 ZIP 文件会显示提示；车辆文件名仍在实际安装前校验。
-- **安装进度动效**：根据源文件校验、复制和完整性验证的实际处理量平滑更新进度，同时显示当前文件、批次和处理阶段；结束后显示结果颜色并淡出。
-- **删除卡片动画**：确认删除且文件操作成功后，卡片收拢消失，其余卡片平滑补位；删除失败时保留卡片并显示错误。
-- **继续支持中英文与游戏锁定**：新增提示支持简体中文 / English。游戏运行或状态无法确认时，拖拽高亮及文件操作均锁定，旧的拖拽请求不会在解锁后补执行。
-
-进度代表整批文件的处理进度，拒绝或跳过的文件也算已处理；是否成功安装以完成提示为准。Windows 原生拖拽初始化失败时会退回原有拖放方式，此时没有移入高亮，仍可通过按钮导入。
-
-如需关闭动效，先退出管理器，在 `%LOCALAPPDATA%\FH6CarModManager\settings.json` 的现有 JSON 对象中加入或修改 `"animations": false`，保留其他配置，再重新打开程序。默认启用动画。
-
-### English update notes
-
-Version 0.8.3 adds smoother page transitions, ZIP drag-over feedback, work-based import progress, and a collapse animation after successful deletion. Existing cards and navigation objects are retained during animation to reduce flicker. New messages support English. Game-running protection still blocks changes and discards pending drops.
-
-## v0.8.2 更新说明
-
-修复模组预览首次生成失败后，每次重新打开管理器都会重复尝试、浪费时间的问题。
-
-- **记住失败状态**：预览生成失败后保存记录，重启管理器直接跳过该模组。
-- **切换状态不重复生成**：启用、禁用及同名版本自动改名不会触发失败预览重试。
-- **保留手动重试**：选中车辆，点击“重建所选缩略图”即可重试；成功后清除对应失败记录。
-- **内容变更允许重试**：更换模组内容后允许重新生成；相同内容的副本会在内容校验后跳过渲染。
-- **中断不算失败**：游戏启动、暂停、关闭程序或任务被替换造成的中断，不会写入失败记录。
-
-> 旧版未保存失败状态。升级到 v0.8.2 后，此前失败的模组可能仍会尝试一次，以建立失败记录。
-
-## 主要功能
-
-| 功能 | 说明 |
-| --- | --- |
-| 自动定位游戏 | 检测游戏安装位置，区分 Steam 与 Xbox 目录结构；未找到时可手动指定 |
-| 拖放安装 | 将一个或多个车辆 ZIP 拖入程序窗口，显示拖入高亮；也可通过按钮批量导入 |
-| 安装进度 | 根据文件校验、复制及完整性验证的实际处理量显示平滑进度 |
-| 文件名校验 | 导入前与游戏原版车辆目录核对文件名，不匹配的模组会被拒绝 |
-| 一键启用 / 禁用 | 通过切换 `.zip` 与 `.zipdisabled` 后缀管理状态 |
-| 同名多版本管理 | 同一车辆可以保留多个模组版本，但最多同时启用一个 |
-| 自动车辆预览 | 使用基于 ForzaTech Studio 的独立渲染组件生成车辆缩略图 |
-| 宫格与筛选 | 上方显示预览、下方显示文件名；支持搜索及全部、已启用、已禁用、同名版本筛选 |
-| 失败预览记忆 | 保存失败记录，重启后不再自动重试；可手动重建所选车辆预览 |
-| 手动缩略图 | 为选中模组导入本地图片，独立保存并优先显示 |
-| 单车预览重建 | 只重新生成当前选中车辆的缩略图，保留其他车辆缓存 |
-| 删除模组 | 默认交由 Windows 回收站处理；成功后卡片收拢消失，其余卡片平滑补位 |
-| 游戏运行锁定 | 检测到游戏运行时，操作按钮灰显，禁止导入、切换、删除及修改设置 |
-| 中英文界面 | 在设置页切换简体中文 / English，立即生效并记忆选择 |
-| 缓存空间管理 | 自动清理过期预览、符合条件的残留临时任务，并限制预览缓存大小 |
-
-## 下载与运行
-
-1. 在仓库的 **Releases** 页面下载 `FH6CarModManager-win-x64.zip` 便携包。
-2. 将压缩包**完整解压**到一个可写的文件夹。
-3. 运行 `FH6CarModManager.exe`。
-4. 首次启动后确认程序识别的游戏与模组目录。
-
-请保留 EXE 同目录下的 `_internal`、`renderer` 和许可文件。不要只复制 EXE，也不要直接在压缩包中运行。
-
-便携版使用者无需单独安装 Python。自动缩略图需要完整的渲染组件及可用的 Windows 图形环境。
-
-> GitHub 自动提供的 `Source code (zip)` 以及文件名含 `Source_Build` 的压缩包都是源码包，不含可直接运行的预编译 EXE。直接使用程序，请下载 Release 中单独附加的便携包；若尚未提供便携包，请按下文从源码构建。
-
-## 使用方法
-
-### 1. 确认游戏目录
-
-程序会优先查找 `forzahorizon6.exe`，并根据安装结构确定模组目录。缺少对应模组文件夹时，会创建该文件夹。
-
-| 版本 | 游戏程序位置 | 模组目录 | 原版车辆校验目录 |
+| 游戏版本 / Edition | 游戏程序 / Game executable | 模组目录 / Mod folder | 原版车辆校验目录 / Original car folder for validation |
 | --- | --- | --- | --- |
 | Steam | `Forza Horizon 6\forzahorizon6.exe` | `Forza Horizon 6\mediapc\cars` | `Forza Horizon 6\media\cars` |
 | Xbox | `Forza Horizon 6\Content\forzahorizon6.exe` | `Forza Horizon 6\Content\mediapc\Cars` | `Forza Horizon 6\Content\media\cars` |
 
-Steam 安装位置支持检测不同磁盘上的 Steam 库。如果自动检测失败，可以在设置页手动指定位置。使用自定义模组目录时，还需确认原版车辆校验目录正确。
+如果自动检测失败，在 **设置** 页选择游戏 EXE 或手动指定模组文件夹。使用自定义位置时，也要确认原版车辆校验目录正确。  
+If detection fails, open **Settings** and select the game EXE or specify the mod folder manually. When using a custom location, also check that the original car folder used for filename validation is correct.
 
-识别目录后，程序会显示其中已有的 `.zip` 和 `.zipdisabled` 模组。
+### 3. 导入车辆模组 / Import car mods
 
-### 2. 导入车辆模组
+将一个或多个车辆 `.zip` 文件拖入程序窗口，或点击 **导入车辆 ZIP / Import ZIP** 选择文件。无需解压车辆 ZIP。  
+Drag one or more car `.zip` files into the window, or click **Import ZIP** to select them. Do not extract the car ZIP files.
 
-关闭游戏，将车辆 `.zip` 文件拖入程序窗口，或点击 **导入车辆 ZIP** 选择文件。
+拖入时会显示高亮提示和 ZIP 数量；安装过程中显示当前文件、处理阶段和进度。进度表示已处理的工作量，拒绝或跳过的文件也算已处理，请以完成提示中的结果为准。  
+Dragging ZIP files into the window displays a highlight and file count. During installation, the manager shows the current file, processing stage and progress. Progress includes rejected or skipped files, so check the completion message for the actual result.
 
-导入文件的完整名称（包括 `.zip` 后缀）必须与原版 `media\cars` 目录中的某个车辆文件名一致，比较时不区分大小写。
+导入文件的完整名称必须与原版 `media\cars` 文件夹中的某个车辆文件名一致，包含 `.zip` 扩展名，但不区分大小写。  
+The complete filename must match a car file in the original `media\cars` folder, including the `.zip` extension. Matching is case-insensitive.
 
-例如，原版目录存在 `Example_Car.zip`：
+例如，原版目录中有 `Example_Car.zip`：  
+For example, if the original folder contains `Example_Car.zip`:
 
-| 导入文件名 | 结果 |
+| 文件名 / Filename | 结果 / Result |
 | --- | --- |
-| `Example_Car.zip` | 允许导入 |
-| `example_car.ZIP` | 允许导入 |
-| `Example_Car (1).zip` | 拒绝导入 |
-| `Example_Car_改装版.zip` | 拒绝导入 |
+| `Example_Car.zip` | 允许导入 / Accepted |
+| `example_car.ZIP` | 允许导入 / Accepted |
+| `Example_Car (1).zip` | 拒绝导入 / Rejected |
+| `Example_Car_Custom.zip` | 拒绝导入 / Rejected |
 
-下载文件若被浏览器添加了 `(1)` 等后缀，请先恢复其正确的车辆文件名。无法读取或没有指定校验目录时，程序不会跳过校验。
+如果下载时增加了 `(1)` 等后缀，请先恢复正确的车辆文件名。导入会复制文件到模组目录，保留下载的原文件，也不会覆盖原版车辆目录中的文件。  
+If your browser added a suffix such as `(1)`, restore the correct car filename before importing. Importing copies the file into the mod folder, preserves the downloaded original, and does not overwrite files in the original car folder.
 
-安装时复制完整 ZIP 到模组目录，不需要手动解压，也不覆盖原版 `media\cars` 文件。
+### 4. 启用、禁用与切换版本 / Enable, disable and switch versions
 
-### 3. 启用、禁用与切换版本
+单击车辆卡片后，使用底部按钮管理该模组；也可以双击卡片切换启用状态。  
+Click a vehicle card and use the buttons at the bottom to manage it. You can also double-click a card to toggle its enabled state.
 
-选择一张车辆卡片，使用窗口底部的按钮进行操作。
+- **启用 / Enable**：让所选版本使用游戏识别的车辆 ZIP 文件名。  
+  Give the selected version the car ZIP filename recognized by the game.
+- **禁用 / Disable**：将扩展名改为 `.zipdisabled`。  
+  Change the extension to `.zipdisabled`.
+- **仅启用此版本 / Use this variant**：启用所选版本，同时禁用该车辆的其他版本。  
+  Enable the selected version and disable the other versions of that car.
 
-- **启用**：将目标版本恢复为游戏识别的车辆 ZIP 文件名。
-- **禁用**：将扩展名改为 `.zipdisabled`。
-- **切换同名版本**：启用目标版本，同时禁用该车辆当前启用的其他版本。
+同一车辆可以保留多份模组，但最多同时启用一份。备用版本会自动添加区分后缀；切换时，管理器会自动调整名称，无需手动交换文件名。  
+You can keep multiple mods for the same car, with at most one enabled at a time. Backup versions receive distinguishing suffixes automatically. The manager adjusts their names when switching, so you do not need to swap filenames manually.
 
-同名备用版本由管理器自动添加区分后缀，例如：
+### 5. 搜索与筛选 / Search and filter
 
-```text
-Example_Car.zip
-Example_Car__fh6mm_v1.zipdisabled
-Example_Car__fh6mm_v2.zipdisabled
-```
+左侧可筛选 **全部模组、已启用、已禁用、同名版本**。搜索框按文件名查找，可与筛选同时使用。  
+Use the sidebar to show **All mods, Enabled, Disabled or Variants**. Search by filename using the search box; search and filters can be combined.
 
-切换时，管理器会自动调整文件名，使启用版本使用原始车辆名称，禁用版本使用区分后缀。无需手动交换文件名。
+### 6. 自动缩略图与手动重试 / Automatic previews and retries
 
-### 4. 查看与刷新缩略图
+程序会为可见的车辆卡片自动生成预览并保存结果，禁用的模组也可以生成缩略图。预览可能与游戏内显示不同；只修改性能参数的模组，图片可能没有区别。  
+The manager automatically generates and saves previews for visible vehicle cards, including disabled mods. Previews may differ from the in-game appearance. Mods that only change performance settings may look identical.
 
-程序在后台为可见的车辆卡片请求预览，并缓存生成结果。禁用的模组也可以生成缩略图，无需先启用。
+生成失败后会显示 **预览失败 · 手动重试 / Preview failed · Retry manually**。重启管理器不会反复尝试。选中车辆并点击 **重建所选缩略图 / Rebuild preview**，可手动重试，仅影响所选模组。  
+After a failure, the card displays **Preview failed · Retry manually**. Restarting the manager does not repeatedly retry it. Select the vehicle and click **Rebuild preview** to retry only that mod.
 
-预览生成失败后，卡片显示 **预览失败 · 手动重试**（英文界面为 **Preview failed · Retry manually**）。管理器会保存失败记录，再次打开时直接跳过该模组，不会反复启动渲染器。
+更换模组内容后允许重新生成。游戏启动、暂停或关闭管理器造成的中断，不会被记为预览失败。  
+Replacing the mod’s contents allows a new preview attempt. Interruptions caused by starting the game, pausing generation or closing the manager are not recorded as preview failures.
 
-如需重试，或需要刷新共享贴图变化后的效果，选中该车辆，点击 **重建所选缩略图**。这只刷新当前选中车辆，不会清空全部缓存。重建成功后清除对应内容的失败记录；如果仍失败，后续重启依然会跳过。
+### 7. 手动导入缩略图 / Import a custom preview
 
-更换模组内容后允许重新生成。游戏启动、暂停或程序关闭造成的任务中断不会记为生成失败。
+1. 选中需要更换图片的车辆卡片。  
+   Select the vehicle card whose picture you want to change.
+2. 点击底部 **导入缩略图 / Import preview**。  
+   Click **Import preview** at the bottom.
+3. 选择一张 **PNG、JPG / JPEG、WebP 或 BMP** 图片。  
+   Choose a **PNG, JPG / JPEG, WebP or BMP** image.
 
-缩略图使用临时副本读取模型与贴图，不修改模组原文件。预览效果可能与游戏内不同；如果模组只修改性能参数而没有改变模型，缩略图也可能相同。
+图片会自动校正方向、等比例缩放并居中留边，不拉伸、不裁切；透明区域使用预览背景色，动画图片使用第一帧。  
+The image is automatically oriented, resized proportionally and centered with padding, without stretching or cropping. Transparent areas use the preview background color. Animated images use their first frame.
 
-### 5. 删除模组
+手动图片优先于自动预览，即使自动生成失败或没有安装渲染组件，也可以使用。取消选择或导入失败时，原有图片会保留，所选图片和车辆 ZIP 均不会被修改。  
+Custom pictures take priority over automatic previews and work even if automatic generation fails or the rendering component is unavailable. Cancelling or a failed import preserves the previous picture. Neither the selected image nor the car ZIP is modified.
 
-选中目标卡片，点击 **删除所选模组**，确认文件名后删除。
+图片仅绑定所选模组文件。重启、启用、禁用及同名版本改名后仍会保留，不会同时替换其他文件的图片。重新复制为另一个文件或更换模组内容后，需要重新指定图片。  
+The picture belongs only to the selected mod file. It survives restarts, enabling, disabling and variant renames without changing other files’ pictures. If you create a new copy or replace the mod’s contents, assign a picture again.
 
-删除只针对选中的一份文件，不连带删除同名其他版本。删除启用版本后，不会自动启用备用版本。
+**再次导入可替换手动图片；点击“重建所选缩略图”会移除手动图片并尝试自动生成。**  
+**Import another image to replace the custom picture. Clicking “Rebuild preview” removes it and attempts automatic generation.**
 
-默认使用 Windows 回收站；如果所在磁盘或目录不支持回收，请留意 Windows 显示的删除提示。
+### 8. 删除模组 / Delete a mod
 
-## 游戏运行保护
+选中卡片，点击 **删除所选模组 / Delete**，核对文件名后确认。默认交由 Windows 回收站处理；请留意系统显示的删除提示。  
+Select a card, click **Delete**, check the filename and confirm. The manager normally sends the file to the Windows Recycle Bin; pay attention to any system deletion prompts.
 
-检测到 `forzahorizon6.exe` 正在运行时，管理器会锁定操作按钮、拖放导入和设置修改，并暂停缩略图生成。游戏退出后恢复操作。
+删除只影响选中的一份文件，不会连带删除同名其他版本。删除启用版本后，不会自动启用备用版本。成功后卡片消失，其余卡片补位；失败时保留卡片并提示错误。  
+Only the selected file is deleted; other versions of the same car remain. Deleting an enabled version does not automatically enable a backup. After successful deletion, its card disappears and the remaining cards move into place. On failure, the card stays and an error is shown.
 
-如果进程状态检测失败，程序也会保持锁定，避免在状态不明时更改模组。
+### 9. 更改语言 / Change the language
 
-## 缓存与空间占用
+打开 **设置 → 界面语言 / Language**，选择 **简体中文** 或 **English**。更改立即生效，并在下次打开时保留。  
+Open **Settings → Language** and choose **简体中文** or **English**. The change takes effect immediately and is remembered for the next launch.
 
-配置及缓存保存在：
+### 10. 游戏运行锁定 / Game-running protection
 
-```text
-%LOCALAPPDATA%\FH6CarModManager
-```
+游戏运行时，操作按钮、拖放和设置修改会被锁定，自动预览生成也会暂停。退出游戏后恢复操作。无法确认游戏状态时同样保持锁定。  
+While the game is running, action buttons, drag-and-drop and settings changes are locked, and automatic preview generation is paused. Controls become available again after the game exits. They also remain locked when the game’s status cannot be confirmed.
 
-按 **Win + R**，粘贴以下路径并回车，可直接打开缩略图缓存目录：
+文件操作期间请等待完成。锁定期间的拖放请求不会在解锁后补执行，需要重新拖入。  
+Wait for ongoing file operations to finish. Drops made while controls are locked are not carried out later; drag the files in again after unlocking.
 
-```text
-%LOCALAPPDATA%\FH6CarModManager\thumbnails
-```
+### 11. 查看与清理缩略图 / Find and clear preview images
 
-| 文件 | 用途 |
-| --- | --- |
-| `*.png` | 已生成的车辆预览图片 |
-| `failed-previews.json` | 预览生成失败记录，重启后用于跳过失败模组 |
-| `errors.log` | 缩略图生成错误日志 |
+按 **Win + R**，粘贴以下路径并回车：  
+Press **Win + R**, paste the following path and press Enter:
 
-- PNG 预览缓存默认限额为 **256 MiB**，超额时优先清理较久未使用的预览。
-- 清理 **30 天未访问**的旧预览；当前新生成的图片受保护。
-- 清理带有管理器所有权标记、超过 **24 小时**的残留临时任务。
-- 错误日志超过 **2 MiB** 时轮换，保留一份旧日志。
-- 命中预览缓存时，不再创建完整车辆 ZIP 的临时副本。
-- 自动清理 PNG 缓存不会清除失败记录；需要重试某辆车时，使用“重建所选缩略图”。
+`%LOCALAPPDATA%\FH6CarModManager\thumbnails`
 
-缓存限额不包含渲染过程中使用的临时空间。渲染组件采用独立构建入口，排除完整编辑器的主界面、文档组件与宣传素材，保留模型读取、贴图解码和运行所需依赖。
+自动生成的图片默认最多保留 **256 MiB**，并清理 **30 天未访问**的旧预览。该限额不包括生成过程中的临时空间和手动图片。  
+Automatically generated images have a default **256 MiB** limit, with old previews cleared after **30 days without access**. This limit excludes temporary generation space and custom pictures.
 
-## 从源码构建
+手动导入的图片单独保存在：  
+Custom pictures are stored separately in:
 
-构建环境：
+`%LOCALAPPDATA%\FH6CarModManager\thumbnails\manual`
 
-- Windows 10 / 11 x64
-- Python 3.12 x64，包含 Tcl/Tk、pip 和 Python launcher
-- .NET 9 SDK x64
-- Visual Studio 2022 / Build Tools，以及所需 Windows SDK 和桌面应用构建组件
-- 能访问 PyPI 与 NuGet 的网络
+手动图片不会被自动缓存清理删除。已删除或已替换的模组可能留下旧图片；需要清理时，请先关闭管理器。清空此文件夹会移除全部手动缩略图，但不会删除车辆模组。  
+Automatic cache cleanup does not remove custom pictures. Deleted or replaced mods may leave old pictures behind; close the manager before cleaning them up. Emptying this folder removes all custom previews but does not delete any car mods.
 
-完整解压或克隆源码后，关闭游戏与管理器，运行：
+如果只是想重新生成某一辆车的图片，请使用 **重建所选缩略图**，无需清空整个缓存目录。  
+To regenerate just one vehicle’s picture, use **Rebuild preview** instead of clearing the entire cache folder.
 
-```bat
-Build_EXE.bat
-```
+## 更新内容 / Release notes
 
-构建脚本会执行 Python 测试、打包管理器、编译渲染组件，并检查应用资源及实际 PNG 导出。自检失败时会停止打包。
+### v0.8.4 — 手动缩略图 / Custom previews
 
-成功后的输出：
+- 新增 **导入缩略图**，支持 PNG、JPEG、WebP 和 BMP。  
+  Added **Import preview**, supporting PNG, JPEG, WebP and BMP.
+- 手动图片按模组独立保存，重启及切换启用状态后保留，并优先显示。  
+  Custom pictures are saved separately for each mod, survive restarts and enabled-state changes, and take priority over automatic previews.
+- 自动校正图片方向并等比例适配；导入失败保留旧图。  
+  Images are automatically oriented and fitted proportionally; failed imports preserve the previous picture.
+- 支持通过 **重建所选缩略图** 恢复自动生成。  
+  Use **Rebuild preview** to return to automatic generation.
 
-```text
-程序入口：dist\FH6CarModManager\FH6CarModManager.exe
-便携压缩包：dist\FH6CarModManager-win-x64.zip
-体积报告：package-size-report.txt
-```
+### v0.8.3 — 交互与动画 / Interaction and animation
 
-更多说明见 [Windows 构建指南](WINDOWS_QUICKSTART.md)。
+- 优化页面切换，修复动画结束时的闪烁，并改善连续切换的衔接。  
+  Improved page transitions, fixed flicker at the end of animations, and made rapid navigation smoother.
+- 改善卡片刷新、悬停、选中和启用状态的过渡。  
+  Improved card refreshes and transitions for hover, selection and enabled states.
+- 新增 ZIP 拖入高亮、文件数量提示和安装进度动效。  
+  Added ZIP drag-over highlighting, file-count feedback and animated installation progress.
+- 删除成功后卡片收拢消失，其余卡片平滑补位。  
+  Successfully deleted cards collapse away while the remaining cards move smoothly into place.
+- 新增交互提示支持中英文，并遵循游戏运行锁定。  
+  New interaction messages support Chinese and English and respect game-running protection.
 
-## 常见问题
+### v0.8.2 — 记住预览失败状态 / Remember failed previews
 
-**为什么提示文件名不匹配？**  
-检查下载文件是否被添加了额外后缀，并确认设置中的校验目录指向当前游戏的 `media\cars`。管理器按完整文件名校验，不会根据车型名称模糊匹配。
-
-**为什么按钮都是灰色的？**  
-先查看侧栏游戏状态。游戏正在运行、进程状态无法确认或文件操作尚未完成时，部分或全部操作会被锁定。
-
-**为什么没有缩略图？**  
-先确认保留了完整的 `renderer` 文件夹，再尝试重建所选缩略图。若某个模组仍失败，可查看：
-
-```text
-%LOCALAPPDATA%\FH6CarModManager\thumbnails\errors.log
-```
-
-**为什么重启后不再尝试生成失败的缩略图？**  
-这是 v0.8.2 的预期行为，用于避免重复尝试浪费时间。选中车辆，点击 **重建所选缩略图** 即可手动重试，无需删除整个缓存目录。
-
-**如何反馈问题？**  
-在仓库 Issues 中说明程序版本、Steam / Xbox 版本、复现步骤和错误提示。构建问题可附上 `build-windows.log`、`test-results.log`、`renderer-resources.log` 和 `renderer-check.log` 中实际生成的相关日志。
-
-## 致谢与第三方说明
-
-- [ForzaTech Studio](https://github.com/D3FEKT/ForzaTechStudio)：车辆资源读取与 3D 查看器的基础，本项目使用修改后的独立缩略图构建版本。
-- [HelixToolkit](https://github.com/helix-toolkit/helix-toolkit)：ForzaTech Studio 渲染所使用的图形组件。
-- [Plain Craft Launcher](https://github.com/Meloong-Git/PCL)：蓝白配色与界面布局参考；本工具使用 Tk 独立实现，未引入 PCL 源码或素材。
-
-第三方代码与依赖遵循各自许可证。ForzaTech Studio 的原始许可保留在 [vendor/ForzaTechStudio/LICENSE](vendor/ForzaTechStudio/LICENSE)，修改记录见 [第三方说明](THIRD_PARTY_NOTICES.md)。
-
-本工具为非官方项目，与 Forza、Xbox、ForzaTech Studio 或 PCL 官方无隶属关系。工具不附带游戏车辆资源或车辆模组。
+- 预览失败后保存记录，重启不再反复尝试。  
+  Preview failures are remembered, preventing repeated attempts after restarting.
+- 启用、禁用及同名版本改名不会触发失败预览的自动重试。  
+  Enabling, disabling and variant renames do not automatically retry failed previews.
+- 保留所选车辆的手动重试；更换模组内容后可重新生成。  
+  Manual retries remain available for the selected vehicle, and replacing a mod’s contents allows a new attempt.
+- 游戏启动、暂停或关闭程序造成的中断不计为生成失败。  
+  Interruptions caused by starting the game, pausing or closing the manager are not counted as generation failures.
 
 ---
 
