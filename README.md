@@ -1,12 +1,34 @@
 # FH6 Car Mod Manager
 
-**《极限竞速：地平线 6》车辆模组管理器 · v0.8.3**
+**《极限竞速：地平线 6》车辆模组管理器 · v0.8.4**
 
 将车辆模组的导入、启用、切换和删除集中到一个窗口中。通过车辆缩略图和宫格界面，直观区分不同模组及同一辆车的多个版本，减少反复打开游戏文件夹、手动修改文件名的操作。
 
 **支持 Steam / Xbox 版 · 简体中文 / English · Windows 10 / 11 x64**
 
 **BY：bilibili \_-菠小萝-\_**
+
+## v0.8.4 手动导入缩略图
+
+选中一张车辆卡片，点击底部的 **导入缩略图**，选择图片即可替换这个模组的预览。
+
+- 支持 **PNG、JPG / JPEG、WebP、BMP**；动画图片使用第一帧。
+- 自动校正照片方向，等比例缩放并居中留边，不拉伸、不裁切车身。透明部分使用预览区背景色。
+- 图片保存为一张 684 × 384 的 PNG，不修改所选图片或车辆 ZIP。
+- 手动图片优先显示；即使自动渲染失败或未安装 3D 渲染器，也可以使用。
+- 每个模组文件单独保存，启用、禁用和同名版本改名后仍跟随对应文件；相同内容的另一个文件不会一起换图。重启后继续保留。
+- 再次导入可替换手动图片。点击 **重建所选缩略图** 会移除该模组的手动图片并尝试自动生成；若没有渲染器或渲染失败，显示相应提示。
+- 游戏运行或正在处理文件时，导入按钮同样锁定。取消选择或导入失败会保留原有图片。
+
+手动图片位于 `%LOCALAPPDATA%\FH6CarModManager\thumbnails\manual`，不参与自动预览缓存的过期或容量清理。若模组被删除或内容被替换，旧手动图片可能仍留在此目录；关闭管理器后可手动清理，不影响车辆 ZIP。更换模组内容或重新复制成另一个文件时，需要重新指定图片。
+
+源码运行需先执行 `python -m pip install -r requirements.txt`。`Build_EXE.bat` 会自动安装图片处理依赖 Pillow，打包后的便携版无需额外安装。
+
+**English:** Select a vehicle card and click **Import preview**. PNG, JPEG, WebP and BMP are supported. Custom pictures stay with the selected mod through enable/disable and variant renames, and take priority over automatic previews. **Rebuild preview** removes the custom picture and requests automatic rendering.
+
+## v0.8.3-fix1 构建包修复
+
+重新提供完整源码包，补齐 Windows 拖放和回收站模块。构建前新增文件清单检查；若解压不完整，将直接列出缺失文件并停止，不跳过测试。管理器功能版本仍为 v0.8.3。请解压到新文件夹，再运行 `Build_EXE.bat`。
 
 ## v0.8.3 更新说明
 
@@ -19,7 +41,13 @@
 - **删除卡片动画**：确认删除且文件操作成功后，卡片收拢消失，其余卡片平滑补位；删除失败时保留卡片并显示错误。
 - **继续支持中英文与游戏锁定**：新增提示支持简体中文 / English。游戏运行或状态无法确认时，拖拽高亮及文件操作均锁定，旧的拖拽请求不会在解锁后补执行。
 
+进度代表整批文件的处理进度，拒绝或跳过的文件也算已处理；是否成功安装以完成提示为准。Windows 原生拖拽初始化失败时会退回原有拖放方式，此时没有移入高亮，仍可通过按钮导入。
+
 如需关闭动效，先退出管理器，在 `%LOCALAPPDATA%\FH6CarModManager\settings.json` 的现有 JSON 对象中加入或修改 `"animations": false`，保留其他配置，再重新打开程序。默认启用动画。
+
+### English update notes
+
+Version 0.8.3 adds smoother page transitions, ZIP drag-over feedback, work-based import progress, and a collapse animation after successful deletion. Existing cards and navigation objects are retained during animation to reduce flicker. New messages support English. Game-running protection still blocks changes and discards pending drops.
 
 ## v0.8.2 更新说明
 
@@ -46,6 +74,7 @@
 | 自动车辆预览 | 使用基于 ForzaTech Studio 的独立渲染组件生成车辆缩略图 |
 | 宫格与筛选 | 上方显示预览、下方显示文件名；支持搜索及全部、已启用、已禁用、同名版本筛选 |
 | 失败预览记忆 | 保存失败记录，重启后不再自动重试；可手动重建所选车辆预览 |
+| 手动缩略图 | 为选中模组导入本地图片，独立保存并优先显示 |
 | 单车预览重建 | 只重新生成当前选中车辆的缩略图，保留其他车辆缓存 |
 | 删除模组 | 默认交由 Windows 回收站处理；成功后卡片收拢消失，其余卡片平滑补位 |
 | 游戏运行锁定 | 检测到游戏运行时，操作按钮灰显，禁止导入、切换、删除及修改设置 |

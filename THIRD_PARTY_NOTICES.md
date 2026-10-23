@@ -36,3 +36,7 @@
 ## 0.8.1 资源构建修复
 
 恢复独立工程遗漏的 `EnableMsixTooling`，明确 MRT / PRI 和 XAML 元数据设置，补充启动资源诊断；原有渲染自检保持必需。
+
+## Pillow
+
+Pillow 12.3.0 is used to read and resize user-provided preview pictures. Its license is preserved in `licenses/Pillow.txt` and copied to the built distribution. Project: https://python-pillow.github.io/

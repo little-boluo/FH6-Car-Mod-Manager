@@ -14,7 +14,7 @@ import threading
 import time
 
 from process_watch import game_is_running
-from thumbnail_failures import FailureCache, FAILURE_STATUS
+from thumbnail_failures import FailureCache, FAILURE_STATUS, file_key
 from cache_storage import prune_cache, cleanup_stale_jobs, rotate_error_log, OWNER_FILE, OWNER_VALUE
 from renderer_runtime import external_dll_search, renderer_environment, renderer_failure
 
@@ -92,6 +92,8 @@ class ThumbnailService:
     def __init__(self, home, renderer=None, running=game_is_running, timeout=180):
         self.cache = Path(home) / 'thumbnails'
         self.cache.mkdir(parents=True, exist_ok=True)
+        self.manual = self.cache / 'manual'
+        self.manual.mkdir(exist_ok=True)
         cleanup_stale_jobs(self.cache)
         prune_cache(self.cache)
         rotate_error_log(self.cache)
@@ -134,11 +136,44 @@ class ThumbnailService:
         with self.state_lock:
             self.drain()
             signature = self.signature(source, original, game_root)
+            manual = self.manual / (file_key(signature[0]) + '.png')
+            manual.unlink(missing_ok=True)
             self.revisions[signature] = self.revisions.get(signature, 0) + 1
             self.forced.add(signature)
             self.pending.discard(signature)
             old = self.completed.pop(signature, (None, ''))
             return old[0]
+
+    def import_manual(self, source, image, expected_stamp=None):
+        """Persist for this file identity, including its enable/variant renames."""
+        from manual_previews import prepare_preview
+        source = Path(source)
+        before = stamp(source)
+        if expected_stamp is not None and before != expected_stamp:
+            raise OSError(t('文件已变更'))
+        def check():
+            if self.closed.is_set() or self.running():
+                raise OSError(t('请在游戏关闭时导入缩略图'))
+            if stamp(source) != before:
+                raise OSError(t('文件已变更'))
+        check()
+        target = self.manual / (file_key(before) + '.png')
+        fd, temporary = tempfile.mkstemp(prefix='import-', suffix='.tmp', dir=self.manual)
+        os.close(fd)
+        try:
+            prepare_preview(image, temporary)
+            with self.state_lock:
+                check()
+                os.replace(temporary, target)
+                for signature in set(self.completed) | self.pending | set(self.revisions):
+                    if file_key(signature[0]) == file_key(before):
+                        self.revisions[signature] = self.revisions.get(signature, 0) + 1
+                        self.pending.discard(signature)
+                        self.completed.pop(signature, None)
+                        self.forced.discard(signature)
+            return target
+        finally:
+            Path(temporary).unlink(missing_ok=True)
 
 
     def drain(self):
@@ -159,6 +194,9 @@ class ThumbnailService:
     def request(self, source, original=None, game_root=None):
         self.drain()
         try:
+            manual = self.manual / (file_key(stamp(source)) + '.png')
+            if manual.is_file():
+                return manual, '手动缩略图'
             signature = self.signature(source, original, game_root)
         except OSError:
             return None, '文件暂时不可读取'

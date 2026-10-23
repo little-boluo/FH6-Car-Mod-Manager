@@ -12,6 +12,17 @@ def t(message):
 
 
 EN = {
+    '导入缩略图': 'Import preview',
+    '为所选模组导入缩略图': 'Import preview for selected mod',
+    '图片文件': 'Image files',
+    '正在导入缩略图': 'Importing preview',
+    '已导入所选模组缩略图：': 'Imported preview for selected mod: ',
+    '手动缩略图': 'Custom preview',
+    '请在游戏关闭时导入缩略图': 'Close the game before importing a preview',
+    '图片超过 64 MiB，请先缩小图片': 'Image exceeds 64 MiB; resize it first',
+    '图片超过 4000 万像素，请先缩小图片': 'Image exceeds 40 megapixels; resize it first',
+    '无法读取图片，请选择有效的 PNG、JPEG、WebP 或 BMP 文件': 'Cannot read image; select a valid PNG, JPEG, WebP or BMP file',
+
     '松开以导入 {0} 个 ZIP': 'Release to import {0} ZIP file(s)',
     '请拖入实际的车辆 ZIP 文件': 'Drop vehicle ZIP files here',
     '文件名将在安装前校验，原文件保持不变': 'Names are checked before installation; source files are preserved',
@@ -21,7 +32,7 @@ EN = {
     '已处理': 'Processed',
     '导入 {0}/{1} · {2} · {3}% · {4}': 'Import {0}/{1} · {2} · {3}% · {4}',
 
-    'FH6 Car Mod Manager · 车辆模组管理器 0.8.3': 'FH6 Car Mod Manager 0.8.3',
+    'FH6 Car Mod Manager · 车辆模组管理器 0.8.4': 'FH6 Car Mod Manager 0.8.4',
     '上次使用的模组目录 · 运行状态检测中': 'Last mod folder · Checking game status',
     '尚未定位 mediapc\\Cars': 'mediapc\\Cars not located',
     '正在检测游戏目录': 'Locating the game folder',

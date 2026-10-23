@@ -12,6 +12,8 @@ cache_storage.py
 core.py
 discovery.py
 i18n.py
+licenses/Pillow.txt
+manual_previews.py
 mod_grid.py
 motion_widgets.py
 package_audit.py
@@ -19,9 +21,11 @@ process_watch.py
 renderer_check.py
 renderer_runtime.py
 requirements-build.txt
+requirements.txt
 tests/test_build_checks.py
 tests/test_core.py
 tests/test_interaction_motion.py
+tests/test_manual_previews.py
 tests/test_platform_delete.py
 tests/test_process_lock.py
 tests/test_renderer_runtime.py

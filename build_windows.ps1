@@ -54,6 +54,7 @@ try {
     }
     Copy-Item README.md, THIRD_PARTY_NOTICES.md, WINDOWS_QUICKSTART.md -Destination $output
     New-Item -ItemType Directory -Force (Join-Path $output 'licenses') | Out-Null
+    Copy-Item 'licenses\Pillow.txt' (Join-Path $output 'licenses\Pillow.txt')
     Copy-Item 'vendor\ForzaTechStudio\LICENSE' (Join-Path $output 'licenses\ForzaTechStudio-MIT.txt')
     & $pythonExe (Join-Path $PSScriptRoot 'package_audit.py') $output (Join-Path $PSScriptRoot 'package-size-report.txt')
     if ($LASTEXITCODE -ne 0) { throw 'Could not write package size report.' }

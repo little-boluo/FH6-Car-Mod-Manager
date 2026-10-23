@@ -16,7 +16,7 @@ from discovery import discover
 from process_watch import game_is_running
 from windows_drop import WindowsDrop
 from mod_grid import ModGrid
-from thumbnails import ThumbnailService
+from thumbnails import ThumbnailService, stamp
 import animation
 from animation import Animator
 from motion_widgets import MotionProgress, DropHighlight
@@ -60,7 +60,7 @@ class Application:
                 pass
         i18n.set_language(self.config.get('language', 'zh'))
         animation.set_enabled(self.config.get('animations', True))  # set "animations": false in settings.json to disable
-        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.3'))
+        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.4'))
         root.geometry(f'1440x{min(960, max(700, root.winfo_screenheight()-80))}')
         root.minsize(1050, 670)
         root.configure(bg=BG)
@@ -107,7 +107,7 @@ class Application:
         header.pack_propagate(False)
         tk.Label(header, text='FH6', font=('Segoe UI', 22, 'bold'), bg=ACCENT, fg='white').pack(side='left', padx=(24, 12))
         tk.Label(header, text=t('车辆模组管理器'), font=('Microsoft YaHei UI', 11), bg=ACCENT, fg='#e1efff').pack(side='left')
-        tk.Label(header, text='v0.8.3', bg=ACCENT, fg='#d6e9ff', font=('Segoe UI', 10)).pack(side='right', padx=24)
+        tk.Label(header, text='v0.8.4', bg=ACCENT, fg='#d6e9ff', font=('Segoe UI', 10)).pack(side='right', padx=24)
         navigation = tk.Frame(header, bg=ACCENT)
         navigation.pack(side='right', padx=24)
         self.page_buttons = {}
@@ -194,6 +194,8 @@ class Application:
         self.button(action_row, t('仅启用此版本'), self.enable_selected).pack(side='left', padx=(0, 10))
         self.button(action_row, t('删除所选模组'), self.delete_selected).pack(side='left')
         self.button(action_row, t('重建所选缩略图'), self.retry_thumbnails).pack(side='right')
+        self.import_preview_btn = self.button(action_row, t('导入缩略图'), self.import_thumbnail)
+        self.import_preview_btn.pack(side='right', padx=(0, 10))
         self.tree = ModGrid(mods, self.thumbnail_for, self.selected, self.toggle)
         self.tree.pack(fill='both', expand=True)
 
@@ -282,7 +284,7 @@ class Application:
             child.destroy()
         self.buttons = []
         self.build()
-        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.3'))
+        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.4'))
         if self.manager:
             self.folder.set(str(self.manager.folder))
             self.show_vehicle_directory()
@@ -744,6 +746,34 @@ class Application:
             self.status.set(t('正在重建所选车辆预览：') + filename)
         except Exception as exc:
             self.error(exc)
+
+    def import_thumbnail(self):
+        if not self.can_edit() or not self.manager:
+            return
+        ids = self.tree.selection()
+        if not ids or ids[0] not in self.rows:
+            self.status.set(t('请先在模组宫格中选择一辆车'))
+            return
+        filename = ids[0]
+        source = self.manager.folder / filename
+        try:
+            before = stamp(source)
+            image = filedialog.askopenfilename(parent=self.root, title=t('为所选模组导入缩略图'),
+                filetypes=[(t('图片文件'), '*.png *.jpg *.jpeg *.webp *.bmp'),
+                           ('PNG', '*.png'), ('JPEG', '*.jpg *.jpeg'), ('WebP', '*.webp'), ('BMP', '*.bmp')])
+            if not image or not self.can_edit():
+                return
+            self.run(t('正在导入缩略图'),
+                     lambda: self.thumbnails.import_manual(source, image, before),
+                     lambda path: self._manual_preview_done(filename, path))
+        except Exception as exc:
+            self.error(exc)
+
+    def _manual_preview_done(self, filename, path):
+        self.tree.images.pop(str(path), None)
+        self.tree.image_stamps.pop(str(path), None)
+        self.tree.redraw()
+        self.status.set(t('已导入所选模组缩略图：') + filename)
 
     def guard_game(self, fn):
         if game_is_running():
