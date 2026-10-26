@@ -23,7 +23,9 @@ from motion_widgets import MotionProgress, DropHighlight
 import i18n
 from i18n import t
 
-from ui_theme import BG, PANEL, TEXT, MUTED, ACCENT, BORDER, Card, ScrollPage, RoundedNavButton, MotionButton, setup_style
+from animation import lerp_color
+from ui_theme import (BG, PANEL, TEXT, MUTED, ACCENT_DARK, TRANSPARENT, GREEN, Card, ScrollPage, RoundedNavButton,
+                      MotionButton, GradientHeader, SearchBox, setup_style)
 
 
 def update_widget(widget, **options):
@@ -125,24 +127,17 @@ class Application:
         self.selection_text = tk.StringVar(value=t('选择一张车辆卡片开始管理'))
         self.status = tk.StringVar(value=t('请在游戏关闭时安装或切换模组'))
 
-        header = tk.Frame(self.root, bg=ACCENT, height=72)
+        header = GradientHeader(self.root, 'FH6', t('车辆模组管理器'), 'v0.8.5')
         header.pack(fill='x')
-        header.pack_propagate(False)
-        tk.Label(header, text='FH6', font=('Segoe UI', 22, 'bold'), bg=ACCENT, fg='white').pack(side='left', padx=(24, 12))
-        tk.Label(header, text=t('车辆模组管理器'), font=('Microsoft YaHei UI', 11), bg=ACCENT, fg='#e1efff').pack(side='left')
-        tk.Label(header, text='v0.8.5', bg=ACCENT, fg='#d6e9ff', font=('Segoe UI', 10)).pack(side='right', padx=24)
-        navigation = tk.Frame(header, bg=ACCENT)
-        navigation.pack(side='right', padx=24)
         self.page_buttons = {}
-        for key, label in [('mods', t('模组管理')), ('settings', t('设置')), ('help', t('帮助'))]:
-            b = RoundedNavButton(navigation, label, lambda k=key: self.show_page(k))
+        for key, label, icon in [('mods', t('模组管理'), 'grid'), ('settings', t('设置'), 'gear'), ('help', t('帮助'), 'help')]:
+            b = RoundedNavButton(header, label, lambda k=key: self.show_page(k), icon=icon)
             self.buttons.append(b)
             self.style_navigation(b, key == 'mods')
-            b.pack(side='left', padx=5, pady=6)
+            header.add_tab(b)
             self.page_buttons[key] = b
-            header.configure(height=max(72, b.winfo_reqheight()+14))
 
-        footer = ttk.Frame(self.root, padding=(20, 7))
+        footer = ttk.Frame(self.root, padding=(20, 6))
         footer.pack(side='bottom', fill='x')
         self.footer_status = ttk.Label(footer, textvariable=self.status, style='Muted.TLabel')
         self.footer_status.pack(side='left')
@@ -159,25 +154,32 @@ class Application:
 
         body = ttk.Frame(self.root)
         body.pack(fill='both', expand=True)
-        sidebar = tk.Frame(body, bg=PANEL, width=216)
+        sidebar = tk.Frame(body, bg=PANEL, width=236)
         sidebar.pack(side='left', fill='y')
         sidebar.pack_propagate(False)
-        tk.Frame(body, bg=BORDER, width=1).pack(side='left', fill='y')
-        ttk.Label(sidebar, text='FORZA HORIZON 6', style='CardTitle.TLabel', font=('Segoe UI', 10, 'bold')).pack(anchor='w', padx=20, pady=(22, 5))
-        ttk.Label(sidebar, textvariable=self.location_info, style='CardMuted.TLabel', wraplength=176).pack(anchor='w', padx=20, pady=(0, 16))
-        ttk.Label(sidebar, text=t('模组库'), style='CardMuted.TLabel').pack(anchor='w', padx=20, pady=(0, 9))
+        # PCL: the white sidebar casts a faint 4 px shadow onto the page.
+        edge = tk.Canvas(body, width=4, bg=BG, highlightthickness=0, borderwidth=0)
+        edge.pack(side='left', fill='y')
+        edge.bind('<Configure>', lambda e: [edge.delete('all')] + [
+            edge.create_line(i, 0, i, e.height, fill=lerp_color('#c9d5e6', BG, i / 4)) for i in range(4)])
+        ttk.Label(sidebar, text='FORZA HORIZON 6', style='SideTitle.TLabel').pack(anchor='w', padx=20, pady=(20, 3))
+        ttk.Label(sidebar, textvariable=self.location_info, style='Side.TLabel', wraplength=196).pack(anchor='w', padx=20, pady=(0, 14))
+        ttk.Label(sidebar, text=t('模组库'), style='Side.TLabel').pack(anchor='w', padx=20, pady=(0, 6))
         self.filter_buttons = {}
-        for key, label in [('all', t('全部模组')), ('enabled', t('已启用')), ('disabled', t('已禁用')), ('variants', t('同名版本'))]:
+        for key, label, icon in [('all', t('全部模组'), 'grid'), ('enabled', t('已启用'), 'check'),
+                                 ('disabled', t('已禁用'), 'block'), ('variants', t('同名版本'), 'layers')]:
             b = self.button(sidebar, label, lambda k=key: self.set_filter(k))
-            b.configure(style='NavSelected.TButton' if key == 'all' else 'Nav.TButton')
-            b.pack(fill='x', padx=12, pady=2)
+            b.configure(style='NavSelected.TButton' if key == 'all' else 'Nav.TButton', icon=icon, badge='0')
+            b.pack(fill='x', padx=10, pady=1)
             self.filter_buttons[key] = b
-        bottom = ttk.Frame(sidebar, style='Side.TFrame', padding=(16, 16))
+        bottom = ttk.Frame(sidebar, style='Side.TFrame', padding=(16, 14))
         bottom.pack(side='bottom', fill='x')
-        self.button(bottom, t('＋  导入车辆 ZIP'), self.choose_import, True).pack(fill='x', pady=(0, 9))
-        self.button(bottom, t('打开模组文件夹'), self.open_folder).pack(fill='x', pady=(0, 9))
-        self.game_label = ttk.Label(bottom, textvariable=self.game_status, style='CardMuted.TLabel', wraplength=176)
-        self.game_label.pack(anchor='w', pady=(6, 0))
+        self.game_label = ttk.Label(bottom, textvariable=self.game_status, style='CardMuted.TLabel', wraplength=196)
+        self.game_label.pack(side='bottom', anchor='w', pady=(8, 0))
+        self.button(bottom, t('打开模组文件夹'), self.open_folder).configure(icon='folder')
+        self.buttons[-1].pack(side='bottom', fill='x', pady=(8, 0))
+        self.button(bottom, t('导入车辆 ZIP'), self.choose_import, True).configure(icon='plus')
+        self.buttons[-1].pack(side='bottom', fill='x')
 
         self.page_host = ttk.Frame(body)
         self.page_host.pack(fill='both', expand=True)
@@ -186,21 +188,22 @@ class Application:
         mods = self.pages['mods']
         mods.place(x=22, y=20, relwidth=1, width=-44, relheight=1, height=-40)
         heading = ttk.Frame(mods)
-        heading.pack(fill='x', pady=(0, 14))
+        heading.pack(fill='x', pady=(0, 10))
         self.page_title = tk.StringVar(value=t('全部模组'))
         ttk.Label(heading, textvariable=self.page_title, style='Title.TLabel').pack(side='left')
-        self.button(heading, t('刷新'), self.refresh).pack(side='right')
+        self.button(heading, t('刷新'), self.refresh).configure(icon='refresh')
+        self.buttons[-1].pack(side='right')
         summary = Card(mods, padding=16)
-        summary.pack(fill='x', pady=(0, 14))
-        ttk.Label(summary.body, textvariable=self.stats, style='CardMuted.TLabel', wraplength=1000).pack(anchor='w', pady=(0, 12))
+        summary.pack(fill='x', pady=(0, 10))
+        ttk.Label(summary.body, textvariable=self.stats, style='CardMuted.TLabel', wraplength=1000).pack(anchor='w', pady=(0, 10))
         summary_row = ttk.Frame(summary.body, style='Card.TFrame')
         summary_row.pack(fill='x')
         summary_row.configure(height=62)
         summary_row.pack_propagate(False)
         self.search = tk.StringVar()
-        self.search_entry = ttk.Entry(summary_row, textvariable=self.search, width=24)
-        self.search_entry.pack(side='right')
-        ttk.Label(summary_row, text=t('搜索文件  '), style='CardMuted.TLabel').pack(side='right')
+        search_box = SearchBox(summary_row, self.search, t('搜索文件名'), width=260)
+        search_box.pack(side='right')
+        self.search_entry = search_box.entry
         self.search.trace_add('write', lambda *_: self.render())
         self.drop_title = tk.Label(summary_row, text=t('将车辆 ZIP 拖入此窗口，即可安装'), bg=PANEL, fg=TEXT,
                                    font=('Microsoft YaHei UI', 10), anchor='w', wraplength=400, justify='left')
@@ -208,65 +211,70 @@ class Application:
         self.drop_highlight = DropHighlight(summary_row)
 
         actions = Card(mods, padding=14)
-        actions.pack(side='bottom', fill='x', pady=(14, 0))
+        actions.pack(side='bottom', fill='x', pady=(10, 0))
         ttk.Label(actions.body, textvariable=self.selection_text, style='CardMuted.TLabel', wraplength=960).pack(anchor='w', pady=(0, 10))
         action_row = ttk.Frame(actions.body, style='Card.TFrame')
         action_row.pack(fill='x')
         self.toggle_btn = self.button(action_row, t('启用所选版本'), self.toggle, True)
+        self.toggle_btn.configure(icon='power')
         self.toggle_btn.pack(side='left', padx=(0, 10))
         self.button(action_row, t('仅启用此版本'), self.enable_selected).pack(side='left', padx=(0, 10))
-        self.button(action_row, t('删除所选模组'), self.delete_selected).pack(side='left')
-        self.button(action_row, t('重建所选缩略图'), self.retry_thumbnails).pack(side='right')
+        self.button(action_row, t('删除所选模组'), self.delete_selected).configure(style='Danger.TButton', icon='trash')
+        self.buttons[-1].pack(side='left')
+        self.button(action_row, t('重建所选缩略图'), self.retry_thumbnails).configure(icon='refresh')
+        self.buttons[-1].pack(side='right')
         self.import_preview_btn = self.button(action_row, t('导入缩略图'), self.import_thumbnail)
+        self.import_preview_btn.configure(icon='image')
         self.import_preview_btn.pack(side='right', padx=(0, 10))
         self.tree = ModGrid(mods, self.thumbnail_for, self.selected, self.toggle)
         self.tree.pack(fill='both', expand=True)
 
         settings = self.pages['settings'].body
-        ttk.Label(settings, text=t('设置'), style='Title.TLabel').pack(anchor='w', pady=(0, 6))
-        ttk.Label(settings, text=t('连接游戏目录，管理车辆校验与预览'), style='Muted.TLabel').pack(anchor='w', pady=(0, 12))
-        language_card = Card(settings, padding=12)
-        language_card.pack(fill='x', pady=(0, 10))
+        ttk.Label(settings, text=t('设置'), style='Title.TLabel').pack(anchor='w', pady=(0, 2))
+        ttk.Label(settings, text=t('连接游戏目录，管理车辆校验与预览'), style='Subtitle.TLabel').pack(anchor='w', pady=(0, 12))
+        language_card = Card(settings, padding=15)
+        language_card.pack(fill='x', pady=(0, 12))
         ttk.Label(language_card.body, text=t('界面语言 / Language'), style='CardTitle.TLabel').pack(side='left')
         self.language_value = tk.StringVar(value='English' if i18n.language == 'en' else t('简体中文'))
         self.language_box = ttk.Combobox(language_card.body, textvariable=self.language_value,
                                          values=(t('简体中文'), 'English'), state='readonly', width=16)
         self.language_box.pack(side='right')
         self.language_box.bind('<<ComboboxSelected>>', self.change_language)
-        install = Card(settings, padding=12)
-        install.pack(fill='x', pady=(0, 10))
-        ttk.Label(install.body, text=t('游戏与模组目录'), style='CardTitle.TLabel').pack(anchor='w', pady=(0, 10))
+        install = Card(settings, padding=15, title=t('游戏与模组目录'))
+        install.pack(fill='x', pady=(0, 12))
         ttk.Entry(install.body, textvariable=self.folder, state='readonly').pack(fill='x', pady=(0, 12))
         install_actions = ttk.Frame(install.body, style='Card.TFrame')
         install_actions.pack(fill='x')
-        self.button(install_actions, t('自动检测游戏'), self.auto_detect, True).pack(side='left', padx=(0, 10))
+        self.button(install_actions, t('自动检测游戏'), self.auto_detect, True).configure(icon='search')
+        self.buttons[-1].pack(side='left', padx=(0, 10))
         self.button(install_actions, t('选择游戏 EXE'), self.choose_exe).pack(side='left', padx=(0, 10))
-        self.button(install_actions, t('手动选择模组目录'), self.choose_folder).pack(side='left')
+        self.button(install_actions, t('手动选择模组目录'), self.choose_folder).configure(icon='folder')
+        self.buttons[-1].pack(side='left')
         ttk.Label(install.body, text=t('支持 Steam 与 Xbox 安装位置，首次定位时自动创建模组文件夹。'), style='CardMuted.TLabel').pack(anchor='w', pady=(12, 0))
-        reference = Card(settings, padding=12)
-        reference.pack(fill='x', pady=(0, 10))
-        ttk.Label(reference.body, text=t('车辆文件名校验'), style='CardTitle.TLabel').pack(anchor='w', pady=(0, 10))
+        reference = Card(settings, padding=15, title=t('车辆文件名校验'))
+        reference.pack(fill='x', pady=(0, 12))
         ttk.Label(reference.body, textvariable=self.vehicle_text, style='CardMuted.TLabel', wraplength=900).pack(anchor='w', pady=(0, 12))
-        self.button(reference.body, t('选择车辆校验目录'), self.choose_vehicle_directory).pack(anchor='w')
-        maintenance = Card(settings, padding=12)
-        maintenance.pack(fill='x')
-        ttk.Label(maintenance.body, text=t('预览与恢复'), style='CardTitle.TLabel').pack(anchor='w', pady=(0, 10))
+        self.button(reference.body, t('选择车辆校验目录'), self.choose_vehicle_directory).configure(icon='folder')
+        self.buttons[-1].pack(anchor='w')
+        maintenance = Card(settings, padding=15, title=t('预览与恢复'))
+        maintenance.pack(fill='x', pady=(0, 12))
         ttk.Label(maintenance.body, text=t('仅重新生成宫格中选中车辆的预览；其他车辆缓存保留。'), style='CardMuted.TLabel').pack(anchor='w', pady=(0, 12))
         maintenance_row = ttk.Frame(maintenance.body, style='Card.TFrame')
         maintenance_row.pack(fill='x')
-        self.button(maintenance_row, t('重建所选缩略图'), self.retry_thumbnails).pack(side='left', padx=(0, 10))
-        self.button(maintenance_row, t('恢复中断切换'), self.recover).pack(side='left')
+        self.button(maintenance_row, t('重建所选缩略图'), self.retry_thumbnails).configure(icon='refresh')
+        self.buttons[-1].pack(side='left', padx=(0, 10))
+        self.button(maintenance_row, t('恢复中断切换'), self.recover).configure(icon='restore')
+        self.buttons[-1].pack(side='left')
 
         help_page = self.pages['help'].body
-        ttk.Label(help_page, text=t('使用帮助'), style='Title.TLabel').pack(anchor='w', pady=(0, 20))
+        ttk.Label(help_page, text=t('使用帮助'), style='Title.TLabel').pack(anchor='w', pady=(0, 14))
         for title, content in [
             (t('导入车辆模组'), t('把一个或多个 ZIP 拖到窗口中，或点击左下角的导入按钮。\n文件名必须与原版 media\\cars 中的车辆文件名一致。')),
             (t('管理同名版本'), t('单击卡片选择模组，双击或按空格切换启用状态。\n同一车型只能启用一个版本，其余版本会自动保留并禁用。')),
             (t('游戏运行时锁定'), t('游戏运行期间，全部按钮、筛选、搜索和拖放都会锁定。\n退出游戏后自动恢复；删除模组会移入 Windows 回收站。')),
             (t('关于界面'), t('蓝色导航与浅色卡片布局参考 Plain Craft Launcher。\n本程序独立实现，不属于 PCL 或 Forza 官方项目。'))]:
-            card = Card(help_page)
+            card = Card(help_page, padding=15, title=title)
             card.pack(fill='x', pady=(0, 12))
-            ttk.Label(card.body, text=title, style='CardTitle.TLabel').pack(anchor='w', pady=(0, 8))
             ttk.Label(card.body, text=content, style='CardMuted.TLabel', wraplength=950, justify='left').pack(anchor='w')
 
         # Wrap settings/help copy to the actual card width in either language.
@@ -280,9 +288,8 @@ class Application:
         fit_copy(help_page)
 
     def style_navigation(self, button, selected):
-        button.configure(bg='#edf1f5' if self.locked() else PANEL if selected else ACCENT,
-                         fg=ACCENT if selected else PANEL,
-                         activebackground='#e6f2ff', activeforeground='#125ba3', disabledforeground='#8794a5')
+        # PCL title tabs: transparent over the gradient, the current page is a white pill.
+        button.configure(bg=PANEL if selected else TRANSPARENT, fg=ACCENT_DARK if selected else PANEL)
 
     def change_language(self, *_):
         language = 'en' if self.language_value.get() == 'English' else 'zh'
@@ -434,7 +441,7 @@ class Application:
             update_widget(self.game_label, foreground='#c76b35')
         elif running is False:
             set_var(self.game_status, t('● FH6 未运行 · 可以管理模组'))
-            update_widget(self.game_label, foreground='#278c74')
+            update_widget(self.game_label, foreground=GREEN)
         else:
             set_var(self.game_status, t('● 无法确认游戏状态，操作已锁定，正在自动重试') if error else t('正在检查游戏运行状态…'))
             update_widget(self.game_label, foreground='#a67d29')
@@ -754,6 +761,10 @@ class Application:
         if conflicts:
             text += t('  ·  {0} 组有多个启用文件，请选择要保留启用的版本').format(conflicts)
         set_var(self.stats, text)
+        totals = {'all': len(self.rows), 'enabled': enabled, 'disabled': len(self.rows) - enabled,
+                  'variants': sum(c for c in counts.values() if c > 1)}
+        for key, button in getattr(self, 'filter_buttons', {}).items():
+            button.configure(badge=str(totals[key]))
         self.selected()
 
     def selected(self, *_):

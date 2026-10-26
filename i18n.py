@@ -51,6 +51,8 @@ EN = {
     '已禁用': 'Disabled',
     '同名版本': 'Variants',
     '＋  导入车辆 ZIP': '+  Import ZIP',
+    '导入车辆 ZIP': 'Import ZIP',
+    '搜索文件名': 'Search file names',
     '打开模组文件夹': 'Open mod folder',
     '刷新': 'Refresh',
     '搜索文件  ': 'Search files  ',

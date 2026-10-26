@@ -1,25 +1,44 @@
-"""Original Tk widgets for a light blue, card-based desktop interface.
+"""Original Tk widgets with a PCL (Plain Craft Launcher 2) inspired look.
 
-Motion follows PCL's controls: colours cross-fade from whatever is on screen
+Visual language follows PCL's controls: a 48 px blue gradient title bar with
+pill-shaped icon tabs, a white sidebar of list items with a growing accent bar,
+white cards with soft shadows that tint blue on hover, outlined buttons
+(normal / highlight / red) and slim scroll bars on a light blue backdrop.
+
+Motion follows PCL too: colours cross-fade from whatever is on screen
 (100 ms in, 200 ms out), surfaces dip slightly while pressed and spring back,
-selected list items grow an accent bar, and scroll views glide with additive
-Fluent easing.  Everything is drawn on retained canvas items that are only
-touched when a value really changes, so Tk never repaints more than it must.
+and scroll views glide with additive Fluent easing.  Everything is drawn on
+retained canvas items that are only touched when a value really changes.
 """
+import math
 import tkinter as tk
 from tkinter import ttk
 import weakref
 
 from animation import Animator, lerp_color, out_fluent, in_fluent, out_back, WEAK, MIDDLE, STRONG, EXTRA_STRONG
 
-BG = '#eaf1f9'
+# PCL palette (ColorBrush1-8) on a light blue backdrop.
+TEXT = '#343d4a'        # ColorBrush1
+ACCENT_DARK = '#0b5bcb' # ColorBrush2
+ACCENT = '#1370f3'      # ColorBrush3
+ACCENT_LIGHT = '#4890f5'  # ColorBrush4
+BLUE_5 = '#96c0f9'      # ColorBrush5
+BLUE_6 = '#d5e6fd'      # ColorBrush6
+BLUE_7 = '#e0eafd'      # ColorBrush7
+BLUE_8 = '#eaf2fe'      # ColorBrush8
+BG = '#e6eefa'
 PANEL = '#ffffff'
-TEXT = '#344559'
-MUTED = '#7a8b9f'
-ACCENT = '#1675d1'
-BORDER = '#d3e0ef'
+MUTED = '#7b8594'
+BORDER = '#dbe5f3'
+SHADOW = '#9fb2cc'
+RED, RED_LIGHT, RED_BACK = '#ce2111', '#ff4c4c', '#fdecec'
+GREEN, GREEN_BACK = '#1f9d6b', '#e3f6ee'
+GRAY_TEXT, GRAY_FILL, GRAY_EDGE = '#a6a6a6', '#f5f5f5', '#d6d6d6'
+TITLE_EDGE, TITLE_MID = '#2f7fea', '#4b93f6'
 
+FONT = 'Microsoft YaHei UI'
 COLOR_IN_MS, COLOR_OUT_MS = 100, 200  # PCL MyButton AnimationColorIn / AnimationColorOut
+TRANSPARENT = 'transparent'  # header tabs: show the title bar gradient behind them
 
 
 def rounded_points(x1, y1, x2, y2, radius=10):
@@ -70,6 +89,81 @@ class Retained:
         return item
 
 
+# ---- vector icons (16 px design grid, drawn with retained items) -------------
+
+def _gear_points(cx, cy, s, teeth=8, outer=7.6, inner=5.7):
+    points = []
+    for i in range(teeth * 4):
+        angle = math.pi * 2 * i / (teeth * 4) - math.pi / 2
+        radius = outer if i % 4 in (1, 2) else inner
+        points += [cx + math.cos(angle) * radius * s, cy + math.sin(angle) * radius * s]
+    return points
+
+
+def draw_icon(paint, prefix, name, cx, cy, size, color, backdrop):
+    """Draw icon ``name`` centred on (cx, cy).  Each icon always uses the same
+    items, so retained painting can update colour and position in place."""
+    s = size / 16
+
+    def p(*xy):
+        return tuple(v for i in range(0, len(xy), 2) for v in (cx + (xy[i] - 8) * s, cy + (xy[i + 1] - 8) * s))
+
+    stroke = max(1.2, 1.7 * s)
+    if name == 'grid':
+        for i, (x, y) in enumerate(((1, 1), (9, 1), (1, 9), (9, 9))):
+            paint(f'{prefix}{i}', 'polygon', rounded_points(*p(x, y, x + 6, y + 6), 1.6 * s),
+                  smooth=True, fill=color, outline='')
+    elif name == 'gear':
+        paint(f'{prefix}0', 'polygon', _gear_points(cx, cy, s), fill=color, outline='')
+        paint(f'{prefix}1', 'oval', p(5.4, 5.4, 10.6, 10.6), fill=backdrop, outline='')
+    elif name == 'help':
+        paint(f'{prefix}0', 'oval', p(1, 1, 15, 15), fill='', outline=color, width=stroke)
+        paint(f'{prefix}1', 'text', p(8, 8.4), text='?', fill=color, font=(FONT, -round(10.5 * s), 'bold'))
+    elif name == 'check':
+        paint(f'{prefix}0', 'oval', p(1, 1, 15, 15), fill='', outline=color, width=stroke)
+        paint(f'{prefix}1', 'line', p(4.6, 8.2, 7.1, 10.7, 11.6, 5.7), fill=color, width=stroke,
+              capstyle='round', joinstyle='round')
+    elif name == 'block':
+        paint(f'{prefix}0', 'oval', p(1, 1, 15, 15), fill='', outline=color, width=stroke)
+        paint(f'{prefix}1', 'line', p(3.9, 12.1, 12.1, 3.9), fill=color, width=stroke, capstyle='round')
+    elif name == 'layers':
+        paint(f'{prefix}0', 'polygon', rounded_points(*p(5, 1, 15, 11), 2 * s), smooth=True,
+              fill='', outline=color, width=stroke)
+        paint(f'{prefix}1', 'polygon', rounded_points(*p(1, 5, 11, 15), 2 * s), smooth=True,
+              fill=color, outline=color, width=stroke)
+    elif name == 'plus':
+        paint(f'{prefix}0', 'line', p(8, 2, 8, 14), fill=color, width=stroke * 1.15, capstyle='round')
+        paint(f'{prefix}1', 'line', p(2, 8, 14, 8), fill=color, width=stroke * 1.15, capstyle='round')
+    elif name == 'folder':
+        paint(f'{prefix}0', 'polygon', p(1.5, 3, 6, 3, 7.6, 4.8, 14.5, 4.8, 14.5, 13.5, 1.5, 13.5),
+              fill='', outline=color, width=stroke, joinstyle='round')
+        paint(f'{prefix}1', 'line', p(1.5, 7, 14.5, 7), fill=color, width=stroke)
+    elif name == 'refresh':
+        paint(f'{prefix}0', 'arc', p(2, 2, 14, 14), start=60, extent=285, style='arc', outline=color, width=stroke)
+        paint(f'{prefix}1', 'polygon', p(10.2, 1.2, 14.6, 3.4, 10.6, 6.4), fill=color, outline=color)
+    elif name == 'search':
+        paint(f'{prefix}0', 'oval', p(1.5, 1.5, 11, 11), fill='', outline=color, width=stroke)
+        paint(f'{prefix}1', 'line', p(10, 10, 14.5, 14.5), fill=color, width=stroke * 1.2, capstyle='round')
+    elif name == 'image':
+        paint(f'{prefix}0', 'polygon', rounded_points(*p(1, 2.5, 15, 13.5), 2 * s), smooth=True,
+              fill='', outline=color, width=stroke)
+        paint(f'{prefix}1', 'polygon', p(3, 12, 7, 7.5, 10, 10.5, 11.5, 9, 13.5, 12), fill=color, outline='')
+    elif name == 'trash':
+        paint(f'{prefix}0', 'polygon', p(3.5, 4.5, 12.5, 4.5, 11.6, 14.5, 4.4, 14.5),
+              fill='', outline=color, width=stroke, joinstyle='round')
+        paint(f'{prefix}1', 'line', p(1.5, 4.5, 14.5, 4.5, 14.5, 4.5, 10, 4.5, 10, 2, 6, 2, 6, 4.5),
+              fill=color, width=stroke, joinstyle='round')
+    elif name == 'power':
+        paint(f'{prefix}0', 'arc', p(2, 2.5, 14, 14.5), start=120, extent=300, style='arc', outline=color, width=stroke)
+        paint(f'{prefix}1', 'line', p(8, 1, 8, 8), fill=color, width=stroke, capstyle='round')
+    elif name == 'restore':
+        paint(f'{prefix}0', 'arc', p(2, 2, 14, 14), start=-60, extent=285, style='arc', outline=color, width=stroke)
+        paint(f'{prefix}1', 'polygon', p(1.4, 3.4, 5.8, 1.2, 5.4, 6.4), fill=color, outline=color)
+
+
+ICON_SIZE = 16
+
+
 class HoverTracker:
     """One pointer watcher per window that tells hover-aware containers (whose
     children would otherwise steal <Enter>/<Leave>) whether the pointer is inside."""
@@ -117,25 +211,31 @@ class HoverTracker:
 
 
 class Card(tk.Frame):
-    """Rounded panel with a soft shadow; border and shadow deepen on hover (PCL MyCard)."""
-    SHADOW, SHADOW_HOVER, EDGE_HOVER = '#dce6f2', '#cad9eb', '#b7d3f2'
+    """PCL MyCard: white, 6 px corners, soft shadow that deepens and tints blue on
+    hover, optional bold title in the top-left corner."""
+    RADIUS = 6
+    SHADOW_LAYERS = ((3, .07), (2, .13), (1, .22))  # (spread px, strength)
 
-    def __init__(self, parent, padding=18):
+    def __init__(self, parent, padding=18, title=None):
         super().__init__(parent, bg=BG)
         self.surface = tk.Canvas(self, bg=BG, highlightthickness=0)
         self.surface.place(x=0, y=0, relwidth=1, relheight=1)
         self.body = ttk.Frame(self, style='Card.TFrame')
         self.body.pack(fill='both', expand=True, padx=padding, pady=padding)
+        self.title_label = None
+        if title:
+            self.title_label = ttk.Label(self.body, text=title, style='CardTitle.TLabel')
+            self.title_label.pack(anchor='w', pady=(0, 10))
         self.paint = Retained(self.surface)
         self.anim = Animator(self.surface, self._paint)
         self._size = None
-        self.surface.bind('<Configure>', self._configure)
+        self.surface.bind('<Configure>', self._resized)
         HoverTracker.of(self).register(self)
 
     def set_hover(self, value):
         self.anim.to('hover', 1.0 if value else 0.0, COLOR_IN_MS if value else COLOR_OUT_MS)
 
-    def _configure(self, event):
+    def _resized(self, event):
         size = (event.width, event.height)
         if size != self._size:  # moved but not resized, e.g. during a page transition
             self._size = size
@@ -146,10 +246,19 @@ class Card(tk.Frame):
             return
         width, height = self._size
         hover = self.anim.get('hover')
-        self.paint('shadow', 'polygon', rounded_points(1, 3, width-1, height-1), smooth=True, splinesteps=24,
-                   fill=lerp_color(self.SHADOW, self.SHADOW_HOVER, hover), outline='')
-        self.paint('panel', 'polygon', rounded_points(1, 1, width-1, height-3), smooth=True, splinesteps=24,
-                   fill=PANEL, outline=lerp_color(BORDER, self.EDGE_HOVER, hover))
+        tint = lerp_color(SHADOW, ACCENT_LIGHT, hover)
+        for i, (spread, strength) in enumerate(self.SHADOW_LAYERS):
+            inset = 3 - spread
+            self.paint(f'shadow{i}', 'polygon', rounded_points(inset, inset + 1, width - inset, height - inset + (1 if spread < 3 else 0),
+                                                                self.RADIUS + spread),
+                       smooth=True, splinesteps=24, outline='',
+                       fill=lerp_color(BG, tint, strength * (1 + .5 * hover)))
+        self.paint('panel', 'polygon', rounded_points(3, 3, width - 3, height - 4, self.RADIUS), smooth=True, splinesteps=24,
+                   fill=PANEL, outline='')
+        if self.title_label is not None:
+            color = lerp_color(TEXT, ACCENT_DARK, hover)
+            if str(self.title_label.cget('foreground')) != color:
+                self.title_label.configure(foreground=color)
 
     def destroy(self):
         self.anim.stop()
@@ -166,7 +275,7 @@ class ScrollPage(ttk.Frame):
         scroll = ttk.Scrollbar(self, command=self._scrollbar)
         scroll.pack(side='right', fill='y')
         self.canvas.pack(fill='both', expand=True)
-        self.canvas.configure(yscrollcommand=scroll.set, yscrollincrement=1)
+        self.canvas.configure(yscrollcommand=auto_hide(scroll), yscrollincrement=0)
         self.body = ttk.Frame(self.canvas)
         self.window = self.canvas.create_window(0, 0, window=self.body, anchor='nw')
         self._width = self._region = None
@@ -181,7 +290,7 @@ class ScrollPage(ttk.Frame):
     def _canvas_configure(self, event):
         if event.width != self._width:
             self._width = event.width
-            self.canvas.itemconfigure(self.window, width=event.width)
+            self.canvas.itemconfigure(self.window, width=event.width - 12)  # room for card shadows
 
     def _body_configure(self, event):
         region = (0, 0, event.width, event.height)
@@ -223,83 +332,90 @@ class ScrollPage(ttk.Frame):
             return 'break'
 
 
+def auto_hide(scrollbar):
+    """yscrollcommand that keeps the bar's width but hides its thumb when
+    everything fits (PCL shows a scroll bar only when there is something to scroll)."""
+    def update(first, last):
+        scrollbar.set(first, last)
+        style = 'Idle.Vertical.TScrollbar' if float(first) <= 0 and float(last) >= 1 else 'Vertical.TScrollbar'
+        if str(scrollbar.cget('style')) != style:
+            scrollbar.configure(style=style)
+    return update
+
+
 def setup_style(root):
     s = ttk.Style(root)
     s.theme_use('clam')
-    s.configure('.', background=BG, foreground=TEXT, font=('Microsoft YaHei UI', 10))
+    s.configure('.', background=BG, foreground=TEXT, font=(FONT, 10))
     for name, color in [('TFrame', BG), ('Card.TFrame', PANEL), ('Side.TFrame', PANEL)]:
         s.configure(name, background=color)
     s.configure('TLabel', background=BG, foreground=TEXT)
     s.configure('Muted.TLabel', foreground=MUTED)
     s.configure('Card.TLabel', background=PANEL, foreground=TEXT)
     s.configure('CardMuted.TLabel', background=PANEL, foreground=MUTED)
-    s.configure('CardTitle.TLabel', background=PANEL, foreground=TEXT, font=('Microsoft YaHei UI', 12, 'bold'))
-    s.configure('Title.TLabel', background=BG, foreground=TEXT, font=('Microsoft YaHei UI', 20, 'bold'))
+    s.configure('CardTitle.TLabel', background=PANEL, foreground=TEXT, font=(FONT, 11, 'bold'))
+    s.configure('Side.TLabel', background=PANEL, foreground=MUTED, font=(FONT, 9))
+    s.configure('SideTitle.TLabel', background=PANEL, foreground=TEXT, font=('Segoe UI', 10, 'bold'))
+    s.configure('Title.TLabel', background=BG, foreground=TEXT, font=(FONT, 17, 'bold'))
+    s.configure('Subtitle.TLabel', background=BG, foreground=MUTED, font=(FONT, 10))
     s.configure('TEntry', fieldbackground=PANEL, foreground=TEXT, insertcolor=TEXT,
-                padding=8, bordercolor=BORDER, lightcolor=BORDER, darkcolor=BORDER)
-    s.map('TEntry', bordercolor=[('focus', ACCENT)], fieldbackground=[('readonly', '#f4f8fc'), ('disabled', '#edf1f5')],
-          foreground=[('disabled', '#a8b2bf')])
-    s.configure('Vertical.TScrollbar', background='#c4d8ef', troughcolor=BG, borderwidth=0,
-                arrowcolor=MUTED, arrowsize=12)
+                padding=7, bordercolor=BLUE_5, lightcolor=PANEL, darkcolor=PANEL)
+    s.map('TEntry', bordercolor=[('focus', ACCENT_LIGHT)], fieldbackground=[('readonly', '#f7faff'), ('disabled', GRAY_FILL)],
+          foreground=[('disabled', GRAY_TEXT)])
+    s.configure('TCombobox', fieldbackground=PANEL, background=PANEL, foreground=TEXT, arrowcolor=ACCENT,
+                bordercolor=BLUE_5, lightcolor=PANEL, darkcolor=PANEL, padding=5, arrowsize=14)
+    s.map('TCombobox', fieldbackground=[('readonly', PANEL), ('disabled', GRAY_FILL)],
+          bordercolor=[('focus', ACCENT_LIGHT), ('active', ACCENT_LIGHT)], arrowcolor=[('disabled', GRAY_TEXT)],
+          foreground=[('disabled', GRAY_TEXT)], background=[('active', BLUE_8)])
+    root.option_add('*TCombobox*Listbox.font', (FONT, 10))
+    root.option_add('*TCombobox*Listbox.selectBackground', BLUE_7)
+    root.option_add('*TCombobox*Listbox.selectForeground', ACCENT_DARK)
+    root.option_add('*TCombobox*Listbox.background', PANEL)
+    root.option_add('*TCombobox*Listbox.foreground', TEXT)
+    # PCL MyScrollBar: a slim thumb without arrows.
+    s.layout('Vertical.TScrollbar', [('Vertical.Scrollbar.trough', {'sticky': 'ns', 'children': [
+        ('Vertical.Scrollbar.thumb', {'expand': '1', 'sticky': 'nswe'})]})])
+    s.configure('Vertical.TScrollbar', background=BLUE_5, troughcolor=BG, bordercolor=BG,
+                lightcolor=BLUE_5, darkcolor=BLUE_5, arrowsize=9, gripcount=0, borderwidth=0, relief='flat')
+    s.map('Vertical.TScrollbar', background=[('pressed', ACCENT), ('active', ACCENT_LIGHT)],
+          lightcolor=[('pressed', ACCENT), ('active', ACCENT_LIGHT)], darkcolor=[('pressed', ACCENT), ('active', ACCENT_LIGHT)])
+    s.configure('Idle.Vertical.TScrollbar', background=BG, lightcolor=BG, darkcolor=BG)
+    s.map('Idle.Vertical.TScrollbar', background=[('active', BG)], lightcolor=[('active', BG)], darkcolor=[('active', BG)])
     s.configure('Horizontal.TProgressbar', background=ACCENT, troughcolor=BG, borderwidth=0, thickness=3)
-    # Small nine-slice images give real rounded corners while retaining native
-    # ttk keyboard focus, disabled state and invocation behaviour.
-    root._theme_images = []
-    def sprite(fill, outline):
-        image = tk.PhotoImage(master=root, width=24, height=24)
-        for y in range(24):
-            for x in range(24):
-                dx, dy = max(6-x, 0, x-17), max(6-y, 0, y-17)
-                if dx*dx + dy*dy <= 36:
-                    edge = x in (0, 23) or y in (0, 23) or dx*dx + dy*dy > 24
-                    image.put(outline if edge else fill, (x, y))
-        root._theme_images.append(image)
-        return image
-    definitions = {
-        'TButton': (PANEL, BORDER, '#edf6ff', ACCENT, TEXT),
-        'Accent.TButton': (ACCENT, ACCENT, '#0865bd', '#0865bd', PANEL),
-        'Nav.TButton': (PANEL, PANEL, '#f0f6fd', '#f0f6fd', TEXT),
-        'NavSelected.TButton': ('#e6f2ff', '#e6f2ff', '#d9ebff', '#d9ebff', ACCENT),
-        'Top.TButton': (ACCENT, ACCENT, '#368bdd', '#368bdd', PANEL),
-        'TopSelected.TButton': (PANEL, PANEL, '#edf6ff', '#edf6ff', ACCENT),
-    }
-    for index, (name, (fill, edge, hover, hover_edge, fg)) in enumerate(definitions.items()):
-        element = f'FH6Rounded{index}'
-        normal, active, disabled = sprite(fill, edge), sprite(hover, hover_edge), sprite('#edf1f5', '#e2e8ef')
-        focus = sprite(fill, ACCENT if name != 'Accent.TButton' else '#064b91')
-        s.element_create(element, 'image', normal, ('disabled', disabled), ('pressed', active),
-                         ('active', active), ('focus', focus), border=8, sticky='nsew')
-        s.layout(name, [(element, {'sticky': 'nsew', 'children': [
-            ('Button.padding', {'sticky': 'nsew', 'children': [('Button.label', {'sticky': 'nsew'})]})]})])
-        s.configure(name, background=ACCENT if name.startswith('Top') else PANEL,
-                    foreground=fg, padding=(14, 10), anchor='center')
-        s.map(name, foreground=[('disabled', '#9ca9b8')])
-    s.configure('Nav.TButton', anchor='w', padding=(16, 9))
-    s.configure('NavSelected.TButton', anchor='w', padding=(16, 9))
+    for name in ('TButton', 'Accent.TButton', 'Danger.TButton', 'Nav.TButton', 'NavSelected.TButton'):
+        s.configure(name, background=PANEL, foreground=TEXT, padding=(14, 8))  # ttk fallback only
 
 
 class MotionButton(tk.Canvas):
-    """Drop-in replacement for the app's ttk buttons with PCL-style motion.
+    """Drop-in replacement for the app's ttk buttons with PCL-style looks and motion.
 
-    Supports ``text``, ``command``, ``style`` (TButton, Accent.TButton,
-    Nav.TButton, NavSelected.TButton) and ``state`` through configure/cget.
+    Styles: ``TButton`` (PCL normal), ``Accent.TButton`` (PCL highlight),
+    ``Danger.TButton`` (PCL red), ``Nav.TButton`` / ``NavSelected.TButton``
+    (PCL list items with an accent bar).  Supports ``text``, ``command``,
+    ``style``, ``state``, ``icon`` and ``badge`` through configure/cget.
     """
     # style: normal (fill, edge, text), hover (fill, edge, text), pressed fill
     STYLES = {
-        'TButton': ((PANEL, BORDER, TEXT), ('#edf6ff', ACCENT, ACCENT), '#dcecfd'),
-        'Accent.TButton': ((ACCENT, ACCENT, PANEL), ('#0865bd', '#0865bd', PANEL), '#06559f'),
-        'Nav.TButton': ((PANEL, PANEL, TEXT), ('#f0f6fd', '#f0f6fd', ACCENT), '#e2effc'),
-        'NavSelected.TButton': (('#e6f2ff', '#e6f2ff', ACCENT), ('#d9ebff', '#d9ebff', ACCENT), '#cde4fd'),
+        'TButton': ((PANEL, '#5d6676', TEXT), (BLUE_7, ACCENT, ACCENT), BLUE_6),
+        'Accent.TButton': ((PANEL, ACCENT_DARK, ACCENT_DARK), (BLUE_7, ACCENT, ACCENT), BLUE_6),
+        'Danger.TButton': ((PANEL, RED, RED), (RED_BACK, RED_LIGHT, RED_LIGHT), '#fbdddd'),
+        'Nav.TButton': ((PANEL, PANEL, TEXT), (BLUE_8, BLUE_8, ACCENT), BLUE_7),
+        'NavSelected.TButton': ((PANEL, PANEL, ACCENT_DARK), (BLUE_8, BLUE_8, ACCENT), BLUE_7),
     }
-    DISABLED = ('#edf1f5', '#e2e8ef', '#9ca9b8')
-    FOCUS_RING = '#91c5ff'
-    RADIUS, PADDING, PRESS_DEPTH = 7, (14, 10), .045
-    FONT = ('Microsoft YaHei UI', 10)
+    DISABLED = (GRAY_FILL, GRAY_EDGE, GRAY_TEXT)
+    NAV_DISABLED = (PANEL, PANEL, GRAY_TEXT)
+    FOCUS_RING = ACCENT_LIGHT
+    RADIUS, PADDING, PRESS_DEPTH = 4, (14, 8), .045
+    NAV_PADDING, NAV_HEIGHT = (14, 0), 40
+    FONT = (FONT, 10)
 
-    def __init__(self, parent, text='', command=None, style='TButton', state='normal', cursor='hand2', **kwargs):
+    def __init__(self, parent, text='', command=None, style='TButton', state='normal', cursor='hand2',
+                 icon=None, badge=None, **kwargs):
         from tkinter import font
         self.text, self.command, self.style_name, self.button_state = text, command, style, str(state)
+        self.icon, self.badge = icon, badge
         self.text_font = font.Font(family=self.FONT[0], size=self.FONT[1], weight=self.FONT[2] if len(self.FONT) > 2 else 'normal')
+        self.badge_font = font.Font(family='Segoe UI', size=9)
         self.hovered = self.pressed = self.focus_ring = self._mouse_focus = False
         self.base_cursor = cursor
         super().__init__(parent, bg=surface_color(parent), highlightthickness=0, borderwidth=0, takefocus=True,
@@ -333,9 +449,11 @@ class MotionButton(tk.Canvas):
             kwargs.update(cnf)
         retarget = resize = False
         for key in list(kwargs):
-            if key == 'text':
+            if key in ('text', 'icon', 'badge'):
                 value = kwargs.pop(key)
-                resize, self.text = resize or value != self.text, value
+                if value != getattr(self, key):
+                    setattr(self, key, value)
+                    resize = True
             elif key == 'command':
                 self.command = kwargs.pop(key)
             elif key == 'style':
@@ -346,6 +464,7 @@ class MotionButton(tk.Canvas):
                     if not self.winfo_ismapped():
                         self.anim.set('sel', selected)
                     elif selected:
+                        # PCL MyListItem: the bar grows with a soft overshoot, shrinks quickly.
                         self.anim.to('sel', 1.0, 300, out_back(WEAK))
                     else:
                         self.anim.to('sel', 0.0, 150, in_fluent(WEAK))
@@ -368,6 +487,7 @@ class MotionButton(tk.Canvas):
         if retarget:
             self._retarget(COLOR_OUT_MS)
         else:
+            self._last_frame = None if resize else self._last_frame
             self._paint()
 
     config = configure
@@ -377,6 +497,8 @@ class MotionButton(tk.Canvas):
         if key == 'state': return self.button_state
         if key == 'style': return self.style_name
         if key == 'command': return self.command
+        if key == 'icon': return self.icon
+        if key == 'badge': return self.badge
         return super().cget(key)
 
     def __getitem__(self, key):
@@ -392,14 +514,25 @@ class MotionButton(tk.Canvas):
     def _is_nav(self):
         return self.style_name.startswith('Nav')
 
+    def _icon_width(self):
+        return ICON_SIZE + 8 if self.icon else 0
+
+    def _badge_width(self):
+        return self.badge_font.measure(str(self.badge)) + 14 if self.badge not in (None, '') else 0
+
     def _request_size(self):
-        padx, pady = self.PADDING
-        width = self.text_font.measure(self.text) + 2 * padx + (8 if self._is_nav() else 0)
-        super().configure(width=width, height=self.text_font.metrics('linespace') + 2 * pady)
+        if self._is_nav():
+            width = self.text_font.measure(self.text) + self._icon_width() + self._badge_width() + 2 * self.NAV_PADDING[0] + 12
+            height = max(self.NAV_HEIGHT, self.text_font.metrics('linespace') + 16)
+        else:
+            padx, pady = self.PADDING
+            width = self.text_font.measure(self.text) + self._icon_width() + 2 * padx
+            height = self.text_font.metrics('linespace') + 2 * pady
+        tk.Canvas.configure(self, width=width, height=height)
 
     def _palette(self):
         if self.button_state == 'disabled':
-            return self.DISABLED
+            return self.NAV_DISABLED if self._is_nav() else self.DISABLED
         normal, hover, press_fill = self.STYLES.get(self.style_name, self.STYLES['TButton'])
         if self.pressed:
             return (press_fill,) + hover[1:]
@@ -469,43 +602,66 @@ class MotionButton(tk.Canvas):
             edge = self.FOCUS_RING
         sel = self.anim.get('sel')
         x1, y1, x2, y2 = self._shape(width, height)
-        frame = (width, height, fill, edge, fg, x1, y1, round(sel * 1000), self.text)
+        frame = (width, height, fill, edge, fg, x1, y1, round(sel * 1000), self.text, self.icon, self.badge)
         if frame == self._last_frame:
             return
         self._last_frame = frame
+        nav = self._is_nav()
         self.paint('surface', 'polygon', rounded_points(x1, y1, x2, y2, self.RADIUS),
                    smooth=True, splinesteps=24, fill=fill, outline=edge, width=1)
-        if self._is_nav() or sel > .001:
+        mid = height / 2
+        if nav or sel > .001:
             # PCL MyListItem: an accent bar grows from the middle of the selected item.
-            bar = max(0.0, (height - 18) * sel)
-            mid = height / 2
-            self.paint('indicator', 'polygon', rounded_points(x1 + 3, round(mid - bar/2), x1 + 6, round(mid + bar/2), 1.5),
-                       smooth=True, fill=ACCENT if self.button_state != 'disabled' else self.DISABLED[2],
+            bar = max(0.0, (height - 16) * sel)
+            self.paint('indicator', 'polygon', rounded_points(x1 + 2, round(mid - bar/2), x1 + 6, round(mid + bar/2), 2),
+                       smooth=True, fill=ACCENT if self.button_state != 'disabled' else GRAY_TEXT,
                        outline='', state='normal' if bar >= 2 else 'hidden')
-        padx = self.PADDING[0] + (8 if self._is_nav() else 0)
-        if self._is_nav():
-            self.paint('label', 'text', (x1 - 1 + padx, height / 2), anchor='w', text=self.text, fill=fg, font=self.text_font)
+        if nav:
+            x = x1 + self.NAV_PADDING[0] + 6
         else:
-            self.paint('label', 'text', (width / 2, height / 2), anchor='center', text=self.text, fill=fg, font=self.text_font)
+            x = (width - self.text_font.measure(self.text) - self._icon_width()) / 2
+        if self.icon:
+            draw_icon(self.paint, 'icon', self.icon, round(x + ICON_SIZE / 2), round(mid), ICON_SIZE, fg, fill)
+            x += self._icon_width()
+        self.paint('label', 'text', (round(x), round(mid)), anchor='w', text=self.text, fill=fg, font=self.text_font)
+        if nav:
+            shown = self.badge not in (None, '')
+            bw = self._badge_width()
+            bx2 = x2 - 10
+            selected = self.style_name == 'NavSelected.TButton' and self.button_state != 'disabled'
+            self.paint('badge', 'polygon', rounded_points(bx2 - bw, round(mid - 10), bx2, round(mid + 10), 10),
+                       smooth=True, outline='', fill=BLUE_7 if selected else '#eef2f8',
+                       state='normal' if shown else 'hidden')
+            self.paint('badge_text', 'text', (bx2 - bw / 2, round(mid)), text=str(self.badge or ''), font=self.badge_font,
+                       fill=ACCENT_DARK if selected else MUTED, state='normal' if shown else 'hidden')
 
 
 class RoundedNavButton(MotionButton):
-    """Header tab: draw the text and rounded surface together; no ttk image padding can clip it.
+    """PCL title-bar tab: a 27 px pill with an icon.  Unselected tabs are
+    transparent over the gradient; the selected tab is white with blue text.
 
-    Colours are set through ``bg``/``fg`` (selected tab is white on blue); hover,
-    press and selected-state changes are tweened rather than switched."""
-    HOVER_FILL, PRESS_FILL = '#dceeff', '#c3e0ff'
-    RADIUS, PADDING, PRESS_DEPTH = 12, (18, 11), .06
-    FONT = ('Microsoft YaHei UI', 11)
+    Colours are set through ``bg``/``fg`` (``bg='transparent'`` shows the title
+    bar behind it); hover, press and selection changes are tweened."""
+    RADIUS, PADDING, PRESS_DEPTH = 99, (14, 6), .06
+    FONT = (FONT, 10)
 
-    def __init__(self, parent, text, command, **kwargs):
-        self.fill, self.foreground = ACCENT, PANEL
-        super().__init__(parent, text=text, command=command, style='Top', **kwargs)
-        super().configure(bg=ACCENT)
+    def __init__(self, parent, text, command, icon=None, **kwargs):
+        self.fill, self.foreground, self.backdrop = TRANSPARENT, PANEL, TITLE_MID
+        super().__init__(parent, text=text, command=command, style='Top', icon=icon, **kwargs)
+        tk.Canvas.configure(self, bg=self.backdrop)
+
+    def set_backdrop(self, color):
+        """Colour of the title bar behind this tab (it sits on a gradient)."""
+        if color != self.backdrop:
+            self.backdrop = color
+            tk.Canvas.configure(self, bg=color)
+            self._from = self._to = self._palette()
+            self._last_frame = None
+            self._paint()
 
     def _request_size(self):
-        tk.Canvas.configure(self, width=max(94, self.text_font.measure(self.text) + 36),
-                            height=self.text_font.metrics('linespace') + 22)
+        tk.Canvas.configure(self, width=self.text_font.measure(self.text) + self._icon_width() + 2 * self.PADDING[0],
+                            height=max(27, self.text_font.metrics('linespace') + 2 * self.PADDING[1]))
 
     def _is_nav(self):
         return False
@@ -514,13 +670,18 @@ class RoundedNavButton(MotionButton):
         return False
 
     def _palette(self):
+        base = self.backdrop if self.fill == TRANSPARENT else self.fill
         if self.button_state == 'disabled':
-            return ('#edf1f5', '#edf1f5', '#8794a5')
+            if self.fill == TRANSPARENT:
+                return (base, base, lerp_color(base, PANEL, .55))
+            return ('#eef2f8', '#eef2f8', '#9aa7b8')
+        if self.fill == TRANSPARENT:
+            lift = .32 if self.pressed else .2 if self.hovered else 0.0
+            color = lerp_color(base, PANEL, lift)
+            return (color, color, self.foreground)
         if self.pressed:
-            return (self.PRESS_FILL, self.PRESS_FILL, ACCENT)
-        if self.hovered:
-            return (self.HOVER_FILL, self.HOVER_FILL, ACCENT)
-        return (self.fill, self.fill, self.foreground)
+            return (BLUE_7, BLUE_7, self.foreground)
+        return (base, base, self.foreground)
 
     def configure(self, cnf=None, **kwargs):
         if cnf:
@@ -556,10 +717,132 @@ class RoundedNavButton(MotionButton):
         fill, _, fg = self._colors()
         x1, y1, x2, y2 = self._shape(width - 1, height - 1)
         outline = self.FOCUS_RING if self.focus_ring and self.button_state != 'disabled' else fill
-        frame = (width, height, fill, outline, fg, x1, y1, self.text)
+        frame = (width, height, fill, outline, fg, x1, y1, self.text, self.backdrop)
         if frame == self._last_frame:
             return
         self._last_frame = frame
-        self.paint('surface', 'polygon', rounded_points(x1, y1, x2, y2, self.RADIUS),
-                   smooth=True, splinesteps=24, width=2, fill=fill, outline=outline)
-        self.paint('label', 'text', (width / 2, height / 2), text=self.text, fill=fg, font=self.text_font)
+        self.paint('surface', 'polygon', rounded_points(x1, y1, x2, y2, (y2 - y1) / 2),
+                   smooth=True, splinesteps=24, width=1, fill=fill, outline=outline)
+        x = (width - self.text_font.measure(self.text) - self._icon_width()) / 2
+        if self.icon:
+            draw_icon(self.paint, 'icon', self.icon, round(x + ICON_SIZE / 2), round(height / 2), ICON_SIZE, fg, fill)
+            x += self._icon_width()
+        self.paint('label', 'text', (round(x), round(height / 2)), anchor='w', text=self.text, fill=fg, font=self.text_font)
+
+
+def _hex(rgb):
+    return '#%02x%02x%02x' % rgb
+
+
+class GradientHeader(tk.Canvas):
+    """PCL title bar: a horizontal gradient (darker edges, lighter middle), the
+    logo on the left, centred tabs and a caption on the right."""
+    HEIGHT = 48
+
+    def __init__(self, parent, title, subtitle, caption):
+        from tkinter import font
+        self.title_font = font.Font(family='Segoe UI', size=16, weight='bold')
+        self.sub_font = font.Font(family=FONT, size=10)
+        super().__init__(parent, height=max(self.HEIGHT, self.title_font.metrics('linespace') + 18),
+                         bg=TITLE_EDGE, highlightthickness=0, borderwidth=0)
+        self.paint = Retained(self)
+        self.tabs, self._image, self._width = [], None, None
+        self.texts = (title, subtitle, caption)
+        self.bind('<Configure>', self._resized)
+
+    @staticmethod
+    def color_at(fraction):
+        # Edge → middle → edge, like PCL's three gradient stops.
+        return lerp_color(TITLE_EDGE, TITLE_MID, 1 - abs(fraction * 2 - 1))
+
+    def add_tab(self, tab):
+        self.tabs.append(tab)
+        self._layout()
+
+    def _resized(self, event):
+        if event.width != self._width:
+            self._width = event.width
+            self._layout()
+
+    def _layout(self):
+        width, height = max(2, self.winfo_width()), max(2, int(self.cget('height')))
+        if self._image is None or self._image.width() != width:
+            # One row of colours, tiled down by Tk: cheap even on wide windows.
+            row = ' '.join(self.color_at(x / max(1, width - 1)) for x in range(width))
+            self._image = tk.PhotoImage(master=self, width=width, height=height)
+            self._image.put('{' + row + '}', to=(0, 0, width, height))
+            self.paint('gradient', 'image', (0, 0), anchor='nw', image=self._image)
+        title, subtitle, caption = self.texts
+        self.paint('title', 'text', (22, height / 2), anchor='w', text=title, fill=PANEL, font=self.title_font)
+        self.paint('subtitle', 'text', (30 + self.title_font.measure(title), height / 2 + 1), anchor='w',
+                   text=subtitle, fill=BLUE_6, font=self.sub_font)
+        self.paint('caption', 'text', (width - 20, height / 2), anchor='e', text=caption, fill=BLUE_6, font=self.sub_font)
+        widths = [int(tab.cget('width')) for tab in self.tabs]
+        gap = 10
+        x = (width - sum(widths) - gap * max(0, len(widths) - 1)) / 2
+        left_limit = 40 + self.title_font.measure(title) + self.sub_font.measure(subtitle)
+        x = max(x, left_limit)  # narrow windows: never cover the logo
+        for i, (tab, w) in enumerate(zip(self.tabs, widths)):
+            self.paint(f'tab{i}', 'window', (round(x), height // 2), anchor='w', window=tab)
+            tab.set_backdrop(self.color_at((x + w / 2) / width))
+            x += w + gap
+
+
+class SearchBox(tk.Canvas):
+    """PCL MySearchBox: rounded outline, magnifier icon and a placeholder.
+    ``entry`` is a plain tk.Entry, so state and text behave as usual."""
+    def __init__(self, parent, textvariable, placeholder='', width=240):
+        from tkinter import font
+        self.font = font.Font(family=FONT, size=10)
+        height = self.font.metrics('linespace') + 16
+        super().__init__(parent, width=width, height=height, bg=surface_color(parent),
+                         highlightthickness=0, borderwidth=0)
+        self.variable, self.placeholder = textvariable, placeholder
+        self.entry = tk.Entry(self, textvariable=textvariable, relief='flat', borderwidth=0, highlightthickness=0,
+                              font=self.font, bg=PANEL, fg=TEXT, insertbackground=TEXT,
+                              disabledbackground=GRAY_FILL, disabledforeground=GRAY_TEXT,
+                              selectbackground=BLUE_6, selectforeground=TEXT)
+        self.paint = Retained(self)
+        self.anim = Animator(self, self._paint)
+        self.hovered = self.focused = False
+        self.bind('<Configure>', lambda e: self._paint())
+        for widget in (self, self.entry):
+            widget.bind('<Enter>', lambda e: self._set('hovered', True), add='+')
+            widget.bind('<Leave>', lambda e: self._set('hovered', False), add='+')
+        self.entry.bind('<FocusIn>', lambda e: self._set('focused', True), add='+')
+        self.entry.bind('<FocusOut>', lambda e: self._set('focused', False), add='+')
+        self.bind('<Button-1>', lambda e: self.entry.focus_set())
+        self._trace = textvariable.trace_add('write', lambda *_: self._paint())
+        self.bind('<Destroy>', self._destroyed)
+
+    def _destroyed(self, event):
+        if event.widget is self:
+            self.anim.stop()
+            try:
+                self.variable.trace_remove('write', self._trace)
+            except tk.TclError:
+                pass
+
+    def _set(self, name, value):
+        setattr(self, name, value)
+        target = 1.0 if self.focused else .5 if self.hovered else 0.0
+        self.anim.to('glow', target, COLOR_IN_MS if target else COLOR_OUT_MS)
+
+    def _paint(self):
+        width, height = self.winfo_width(), self.winfo_height()
+        if width <= 2 or height <= 2:
+            return
+        glow = self.anim.get('glow')
+        disabled = str(self.entry.cget('state')) == 'disabled'
+        fill = GRAY_FILL if disabled else PANEL
+        edge = GRAY_EDGE if disabled else lerp_color(lerp_color(BLUE_5, ACCENT_LIGHT, min(1, glow * 2)), ACCENT, max(0, glow * 2 - 1))
+        self.paint('surface', 'polygon', rounded_points(1, 1, width - 1, height - 1, 4), smooth=True, splinesteps=24,
+                   fill=fill, outline=edge, width=1)
+        draw_icon(self.paint, 'icon', 'search', 18, height // 2, 14, GRAY_TEXT if disabled else lerp_color(MUTED, ACCENT, glow), fill)
+        empty = not self.variable.get() and not self.focused
+        # Embedded windows always sit above canvas items, so the entry collapses
+        # while the placeholder is shown; clicking the box focuses it again.
+        self.paint('entry', 'window', (32, height // 2), anchor='w', window=self.entry,
+                   width=1 if empty else max(10, width - 42), height=self.font.metrics('linespace') + 4)
+        self.paint('placeholder', 'text', (34, height // 2), anchor='w', text=self.placeholder, fill=GRAY_TEXT,
+                   font=self.font, state='normal' if empty else 'hidden')

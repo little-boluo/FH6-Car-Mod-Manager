@@ -21,7 +21,8 @@ import queue
 import threading
 import tkinter as tk
 from tkinter import ttk, font
-from ui_theme import BG, PANEL, TEXT, MUTED, ACCENT, BORDER, rounded_points
+from ui_theme import (BG, PANEL, TEXT, MUTED, ACCENT, ACCENT_LIGHT, BLUE_5, SHADOW, GREEN, GREEN_BACK,
+                      rounded_points, auto_hide)
 import animation
 from animation import (Animator, lerp_color, clamp01, linear, out_fluent, in_fluent, out_back,
                        WEAK, MIDDLE, STRONG)
@@ -161,11 +162,12 @@ class ModGrid(ttk.Frame):
         self.hovered = None
         self.canvas = tk.Canvas(self, bg=BG, highlightthickness=0, takefocus=True)
         self.scroll = ttk.Scrollbar(self, command=self._scroll)
-        self.canvas.configure(yscrollcommand=self.scroll.set)
+        self.canvas.configure(yscrollcommand=auto_hide(self.scroll))
         self.scroll.pack(side='right', fill='y')
         self.canvas.pack(fill='both', expand=True)
         self.text_font = font.Font(family='Microsoft YaHei UI', size=10)
-        self.canvas.bind('<Configure>', self._configure)
+        self.name_font = font.Font(family='Microsoft YaHei UI', size=10, weight='bold')
+        self.canvas.bind('<Configure>', self._resized)
         self.canvas.bind('<MouseWheel>', self._wheel)
         self.canvas.bind('<Button-4>', lambda e: self._wheel(e, -1))
         self.canvas.bind('<Button-5>', lambda e: self._wheel(e, 1))
@@ -178,6 +180,7 @@ class ModGrid(ttk.Frame):
         self.positions, self._frame_images, self._line_cache = {}, [], {}
         self._ids, self._ghosts, self._exiting = None, OrderedDict(), None
         self._laid_out = False
+        self._x_offset = 0  # the grid is centred when columns do not fill the width
         self._redraw_id = None
         self.anim = Animator(self.canvas, self._on_frame)
         self.anim.set('lock', 0.0)
@@ -187,7 +190,7 @@ class ModGrid(ttk.Frame):
         self.loader, self._loader_job = PreviewLoader((self.PREVIEW_W, self.PREVIEW_H)), None
 
     # -- scheduling --
-    def _configure(self, event):
+    def _resized(self, event):
         if (event.width, event.height) != self._last_size:  # ignore pure moves (page transitions)
             self._last_size = (event.width, event.height)
             self._request_draw()
@@ -403,7 +406,9 @@ class ModGrid(ttk.Frame):
 
     # -- input --
     def _hit(self, event):
-        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        x, y = self.canvas.canvasx(event.x) - self._x_offset, self.canvas.canvasy(event.y)
+        if x < 0:
+            return None
         col, row = int(x // (self.CARD_W + self.GAP)), int(y // (self.CARD_H + self.GAP))
         if col >= self.columns or x % (self.CARD_W + self.GAP) >= self.CARD_W or y % (self.CARD_H + self.GAP) >= self.CARD_H:
             return None
@@ -563,6 +568,7 @@ class ModGrid(ttk.Frame):
             self.columns = columns
         # Before the canvas has its real size there is no layout worth animating from.
         self._laid_out = width > self.CARD_W
+        self._x_offset = max(0, (width - columns * (self.CARD_W + self.GAP) + self.GAP) // 2)
         height = max(view, math.ceil(len(self.items) / columns) * pitch)
         region = (0, 0, width, height)
         if region != self._region:  # reconfiguring the canvas repaints all of it
@@ -626,7 +632,7 @@ class ModGrid(ttk.Frame):
         scale = 1 - .08 * _exit_scale(exit_progress)
         # Whole-pixel origin: the card is translated rigidly, never re-rasterised.
         lift = round(hover * 2)
-        ox, oy = round(bx), round(by + enter_offset(enter)) - lift
+        ox, oy = round(bx) + self._x_offset, round(by + enter_offset(enter)) - lift
         cx, cy = ox + W / 2, oy + H / 2
 
         def at(px, py):
@@ -638,18 +644,23 @@ class ModGrid(ttk.Frame):
         def locked(color, muted=LOCKED_TEXT):
             return lerp_color(color, muted, lock)
 
-        edge = lerp_color(lerp_color(BORDER, '#88b9ec', hover), ACCENT, sel)
+        # PCL MyCard: white, 6 px corners, a soft shadow that deepens and tints blue on hover.
+        edge = lerp_color(lerp_color(PANEL, BLUE_5, hover), ACCENT, sel)
         if pulse > .01:
-            edge = lerp_color(edge, '#2fb58a' if enabled else '#9aa9bb', pulse)
-        x1, y1 = at(1, 1)
-        x2, y2 = at(W - 2, H - 3)
-        c.item('shadow', 'polygon', rounded_points(x1 + 1, y1 + 3, x2 + 1, y2 + 2 + lift), smooth=True, splinesteps=24,
-               fill=fade(lerp_color('#dce6f2', '#c3d5e8', hover)), outline='')
-        c.item('card', 'polygon', rounded_points(x1, y1, x2, y2), smooth=True, splinesteps=24,
+            edge = lerp_color(edge, GREEN if enabled else '#9aa9bb', pulse)
+        x1, y1 = at(2, 2)
+        x2, y2 = at(W - 3, H - 4)
+        tint = lerp_color(SHADOW, ACCENT_LIGHT, hover)
+        c.item('shadow_far', 'polygon', rounded_points(x1 - 2, y1 - 1, x2 + 2, y2 + 3 + lift, 8), smooth=True, splinesteps=24,
+               fill=fade(lerp_color(BG, tint, .10 + .06 * hover)), outline='')
+        c.item('shadow', 'polygon', rounded_points(x1 - 1, y1, x2 + 1, y2 + 2 + lift, 7), smooth=True, splinesteps=24,
+               fill=fade(lerp_color(BG, tint, .22 + .12 * hover)), outline='')
+        c.item('card', 'polygon', rounded_points(x1, y1, x2, y2, 6), smooth=True, splinesteps=24,
                fill=fade(PANEL), outline=fade(edge), width=2 if sel > .5 or pulse > .15 else 1)
         px1, py1 = at(9, 9)
         px2, py2 = at(9 + self.PREVIEW_W, 9 + self.PREVIEW_H)
-        c.item('preview', 'rectangle', (px1, py1, px2, py2), fill=fade(PREVIEW_BG), outline='')
+        c.item('preview', 'polygon', rounded_points(px1, py1, px2, py2, 4), smooth=True, splinesteps=12,
+               fill=fade(PREVIEW_BG), outline='')
 
         path, status, stamp = self._thumb(iid)
         image, failed = (None, False)
@@ -669,15 +680,28 @@ class ModGrid(ttk.Frame):
         c.item('ph_status', 'text', at(W / 2, 125), text=t(status), width=self.PREVIEW_W - 16, fill=fade('#b6c7d9'),
                font=self.text_font, state='normal' if placeholder else 'hidden', justify='center')
 
+        # Selected cards carry a blue check in the preview corner.
+        mark = 'normal' if sel > .05 and show else 'hidden'
+        mx, my = at(9 + self.PREVIEW_W - 16, 25)
+        radius = round(10 * min(1.0, sel * 1.15))
+        c.item('mark', 'oval', (mx - radius, my - radius, mx + radius, my + radius), fill=ACCENT, outline=PANEL,
+               width=2, state=mark)
+        c.item('mark_check', 'line', (mx - 4, my, mx - 1, my + 3, mx + 5, my - 3), fill=PANEL, width=2,
+               capstyle='round', joinstyle='round', state='normal' if sel > .6 and show else 'hidden')
+
         texts = 'normal' if alpha > .35 else 'hidden'
-        c.item('title', 'text', at(12, 210), anchor='nw', text=self._lines(iid, W - 24),
-               fill=fade(locked(TEXT)), font=self.text_font, state=texts)
+        c.item('title', 'text', at(14, 212), anchor='nw', text=self._lines(iid, W - 28),
+               fill=fade(locked(lerp_color(TEXT, ACCENT, sel * .85))), font=self.name_font, state=texts)
         state_text = t('已启用') if enabled else t('已禁用')
-        badge_width = max(76, self.text_font.measure(state_text) + 20)
-        bx1, by1 = at(12, 254)
-        bx2, by2 = at(12 + badge_width, 277)
-        c.item('badge', 'polygon', rounded_points(bx1, by1, bx2, by2, 8), smooth=True, splinesteps=24,
-               fill=fade(locked(lerp_color('#edf1f6', '#e6f5ee', en), '#eef1f5')), outline='', state=texts)
-        c.item('badge_text', 'text', at(12 + badge_width / 2, 265), text=state_text,
-               fill=fade(locked(lerp_color(MUTED, '#278c74', en))), font=self.text_font, state=texts)
-        c.item('size', 'text', at(W - 14, 265), anchor='e', text=values[4], fill=fade(MUTED), font=self.text_font, state=texts)
+        badge_width = self.text_font.measure(state_text) + 34
+        bx1, by1 = at(14, 254)
+        bx2, by2 = at(14 + badge_width, 276)
+        badge_fill = locked(lerp_color('#eef2f8', GREEN_BACK, en), '#f1f3f6')
+        badge_ink = locked(lerp_color(MUTED, GREEN, en))
+        c.item('badge', 'polygon', rounded_points(bx1, by1, bx2, by2, 11), smooth=True, splinesteps=24,
+               fill=fade(badge_fill), outline='', state=texts)
+        dx, dy = at(26, 265)
+        c.item('badge_dot', 'oval', (dx - 3, dy - 3, dx + 3, dy + 3), fill=fade(badge_ink), outline='', state=texts)
+        c.item('badge_text', 'text', at(36, 265), anchor='w', text=state_text,
+               fill=fade(badge_ink), font=self.text_font, state=texts)
+        c.item('size', 'text', at(W - 16, 265), anchor='e', text=values[4], fill=fade(MUTED), font=self.text_font, state=texts)
