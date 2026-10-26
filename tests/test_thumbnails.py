@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import struct
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -175,6 +176,96 @@ class ThumbnailTests(unittest.TestCase):
                 self.service._generate(self.req())
         self.assertIn('App XAML failed: detail', str(error.exception))
         self.assertFalse(list(self.service.cache.glob('render-*')))
+
+
+class ThumbnailEfficiencyTests(unittest.TestCase):
+    setUp = ThumbnailTests.setUp
+    req = ThumbnailTests.req
+    fake_renderer = ThumbnailTests.fake_renderer
+
+    def restart(self):
+        self.service.close()
+        self.service = ThumbnailService(self.root, self.renderer, running=lambda: False, timeout=.01)
+        self.addCleanup(self.service.close)
+        self.service.set_allowed(True)
+
+    def test_restart_finds_rendered_preview_without_reading_archives(self):
+        with patch('thumbnails.subprocess.Popen', side_effect=self.fake_renderer):
+            first, _ = self.service._generate(self.req())
+        self.restart()
+        with patch('thumbnails.digest_copy', side_effect=AssertionError('re-hashed a known file')), \
+                patch('thumbnails.subprocess.Popen') as popen:
+            again, _ = self.service._generate(self.req())
+        self.assertEqual(again, first)
+        popen.assert_not_called()
+
+    def test_enable_rename_keeps_known_hash(self):
+        with patch('thumbnails.subprocess.Popen', side_effect=self.fake_renderer):
+            first, _ = self.service._generate(self.req())
+        moved = self.root / 'CAR.zip'; self.source.rename(moved); self.source = moved
+        self.restart()
+        with patch('thumbnails.digest_copy', side_effect=AssertionError('re-hashed after rename')):
+            self.assertEqual(self.service._generate(self.req())[0], first)
+
+    def test_new_preview_reads_original_in_place_and_copies_only_the_mod(self):
+        copies, real = [], digest_copy
+        def counted(source, destination=None, check=lambda: None):
+            copies.append((Path(source).name, destination is not None))
+            return real(source, destination, check)
+        def renderer(command, **kwargs):
+            job = json.loads(Path(command[-1]).read_text(encoding='utf-8'))
+            self.assertEqual(Path(job['BaseArchive']), self.original)
+            return self.fake_renderer(command, **kwargs)
+        with patch('thumbnails.digest_copy', side_effect=counted), \
+                patch('thumbnails.subprocess.Popen', side_effect=renderer) as popen:
+            self.service._generate(self.req())
+        popen.assert_called_once()
+        self.assertEqual(copies, [('CAR.zipdisabled', False), ('original.zip', False), ('CAR.zipdisabled', True)])
+        self.assertEqual(popen.call_args.kwargs['creationflags'] & getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0),
+                         getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0))
+
+    def test_original_changed_during_render_is_rejected(self):
+        def renderer(command, **kwargs):
+            process = self.fake_renderer(command, **kwargs)
+            self.original.write_bytes(b'game update!')
+            return process
+        with patch('thumbnails.subprocess.Popen', side_effect=renderer), self.assertRaises(OSError):
+            self.service._generate(self.req())
+        self.assertFalse(list(self.service.cache.glob('*.png')))
+
+    def test_stale_index_is_corrected_without_marking_the_mod_failed(self):
+        req = self.req()
+        self.service.hashes.remember(req.signature[0], '0' * 64)
+        with patch('thumbnails.subprocess.Popen', side_effect=self.fake_renderer) as popen:
+            path, _ = self.service._generate(req)
+        self.assertTrue(path.is_file())
+        popen.assert_called_once()
+        self.assertEqual(self.service.hashes.get(req.signature[0]), hashlib.sha256(b'first-mod').hexdigest())
+        self.assertFalse(self.service.failures.contains_file(req.signature[0]))
+
+    def test_rebuild_forgets_known_hash(self):
+        with patch('thumbnails.subprocess.Popen', side_effect=self.fake_renderer):
+            self.service._generate(self.req())
+        self.service.invalidate(self.source, self.original, self.root)
+        self.assertIsNone(self.service.hashes.get(stamp(self.source)))
+        self.assertIsNotNone(self.service.hashes.get(stamp(self.original)))
+
+    def test_corrupt_index_does_not_prevent_startup(self):
+        (self.service.cache / 'content-hashes.json').write_text('{broken', encoding='utf-8')
+        self.restart()
+        self.assertEqual(self.service.hashes.entries, {})
+
+    def test_recent_requests_go_first_and_same_moment_keeps_order(self):
+        from thumbnails import RecentFirstQueue
+        queue_, now = RecentFirstQueue(), [100.0]
+        item = lambda name: Request(Path(name), None, None, (name,), 0)
+        with patch('thumbnails.time.monotonic', side_effect=lambda: now[0]):
+            queue_.put(item('a')); queue_.put(item('b')); queue_.put(item('c'))
+            now[0] += 5
+            queue_.put(item('d')); queue_.touch(('b',))  # b is still on screen; a and c scrolled away
+            order = [queue_.get(timeout=0).signature[0] for _ in range(4)]
+        self.assertEqual(order, ['b', 'd', 'a', 'c'])
+        self.assertTrue(queue_.empty())
 
 
 if __name__ == '__main__':

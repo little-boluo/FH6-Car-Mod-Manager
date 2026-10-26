@@ -14,6 +14,7 @@ import threading
 import time
 
 from process_watch import game_is_running
+from content_index import ContentIndex
 from thumbnail_failures import FailureCache, FAILURE_STATUS, file_key
 from cache_storage import prune_cache, cleanup_stale_jobs, rotate_error_log, OWNER_FILE, OWNER_VALUE
 from renderer_runtime import external_dll_search, renderer_environment, renderer_failure
@@ -23,6 +24,10 @@ RECIPE = 'fh6-fts-4f373c5-mesh-only-tight-frame-v2-640x360'
 
 class Paused(Exception):
     pass
+
+
+class StaleHash(Exception):
+    """The content index disagreed with the bytes actually copied; not a mod failure."""
 
 
 def stamp(path):
@@ -88,6 +93,61 @@ class Request:
     force: bool = False
 
 
+class RecentFirstQueue:
+    """Pending previews; the most recently requested go first.
+
+    Cards on screen are requested again on every grid refresh, so they overtake
+    cards that were scrolled away.  Requests made within the same second keep
+    their order, so a freshly shown page still fills from the top."""
+    BUCKET = 1.0
+
+    def __init__(self):
+        self.ready = threading.Condition()
+        self.items, self.sequence = {}, 0
+
+    def _rank(self):
+        self.sequence += 1
+        return int(time.monotonic() / self.BUCKET), -self.sequence
+
+    def put(self, req):
+        with self.ready:
+            self.items[req.signature] = (self._rank(), req)
+            self.ready.notify()
+
+    def touch(self, signature):
+        with self.ready:
+            item = self.items.get(signature)
+            if item is not None:
+                bucket, _ = self._rank()
+                if bucket != item[0][0]:
+                    self.items[signature] = ((bucket, item[0][1]), item[1])
+
+    def get(self, timeout=None):
+        with self.ready:
+            if not self.items and not self.ready.wait_for(lambda: self.items, timeout):
+                raise queue.Empty
+            signature = max(self.items, key=lambda key: self.items[key][0])
+            return self.items.pop(signature)[1]
+
+    def empty(self):
+        with self.ready:
+            return not self.items
+
+
+def background_thread():
+    """Give the calling thread low I/O and memory priority on Windows (hashing and copying)."""
+    if os.name != 'nt':
+        return
+    try:
+        import ctypes
+        kernel = ctypes.WinDLL('kernel32')
+        kernel.GetCurrentThread.restype = ctypes.c_void_p
+        kernel.SetThreadPriority.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        kernel.SetThreadPriority(kernel.GetCurrentThread(), 0x00010000)  # THREAD_MODE_BACKGROUND_BEGIN
+    except (OSError, AttributeError):
+        pass
+
+
 class ThumbnailService:
     def __init__(self, home, renderer=None, running=game_is_running, timeout=180):
         self.cache = Path(home) / 'thumbnails'
@@ -99,9 +159,10 @@ class ThumbnailService:
         rotate_error_log(self.cache)
         self.state_lock = threading.RLock()
         self.failures = FailureCache(self.cache)
+        self.hashes = ContentIndex(self.cache)
         self.renderer = Path(renderer) if renderer else renderer_path()
         self.running, self.timeout = running, timeout
-        self.tasks, self.results = queue.Queue(), queue.Queue()
+        self.tasks, self.results = RecentFirstQueue(), queue.Queue()
         self.pending, self.completed = set(), {}
         self.allowed, self.closed = threading.Event(), threading.Event()
         self.generation = 0
@@ -138,6 +199,7 @@ class ThumbnailService:
             signature = self.signature(source, original, game_root)
             manual = self.manual / (file_key(signature[0]) + '.png')
             manual.unlink(missing_ok=True)
+            self.hashes.forget(signature[0])  # rebuild re-reads the file instead of trusting its identity
             self.revisions[signature] = self.revisions.get(signature, 0) + 1
             self.forced.add(signature)
             self.pending.discard(signature)
@@ -209,7 +271,9 @@ class ThumbnailService:
             return None, FAILURE_STATUS
         if not self.renderer.is_file():
             return None, '未安装 3D 渲染组件'
-        if signature not in self.pending and self.allowed.is_set():
+        if signature in self.pending:
+            self.tasks.touch(signature)  # still wanted: keep it ahead of cards scrolled away
+        elif self.allowed.is_set():
             self.pending.add(signature)
             self.tasks.put(Request(Path(source), Path(original) if original else None,
                                    Path(game_root) if game_root else None, signature, self.generation,
@@ -229,8 +293,9 @@ class ThumbnailService:
             raise OSError(t('文件已变更'))
         if not req.force and self.failures.contains_file(req.signature[0]):
             return None, FAILURE_STATUS
-        # Hash only when this file has no known failure (e.g. a copied/new version).
-        mod_hash = digest_copy(req.source, check=lambda: self._check(req))
+        # Hash only when this file has no known failure (e.g. a copied/new version),
+        # and only once per file identity: later launches find the preview directly.
+        mod_hash = self._digest(req.source, req.signature[0], req)
         if not req.force and self.failures.contains_hash(mod_hash):
             with self.state_lock:
                 self._check(req)
@@ -238,6 +303,8 @@ class ThumbnailService:
             return None, FAILURE_STATUS
         try:
             result = self._render(req, mod_hash)
+        except StaleHash:
+            return self._generate(req)  # the entry is gone, so this pass hashes the file itself
         except Paused:
             raise
         except Exception:
@@ -266,8 +333,15 @@ class ThumbnailService:
         except OSError as exc:
             self._log_error(req, exc, 'Could not save failed-preview record')
 
+    def _digest(self, path, path_stamp, req):
+        digest = self.hashes.get(path_stamp)
+        if digest is None:
+            digest = digest_copy(path, check=lambda: self._check(req))
+            self.hashes.remember(path_stamp, digest)
+        return digest
+
     def _render(self, req, mod_hash):
-        base_hash = digest_copy(req.original, check=lambda: self._check(req)) if req.original else ''
+        base_hash = self._digest(req.original, req.signature[1], req) if req.original else ''
         key = cache_key(mod_hash, base_hash, req.game_root, req.signature[3])
         target = self.cache / (key + '.png')
         if valid_png(target) and not req.force and (not self.force_generation or key in self.regenerated):
@@ -277,12 +351,16 @@ class ThumbnailService:
         with tempfile.TemporaryDirectory(prefix='render-', dir=self.cache) as folder:
             folder = Path(folder)
             (folder / OWNER_FILE).write_text(OWNER_VALUE, encoding='utf-8')
+            # The mod is copied so enable/disable/delete never collide with the renderer's
+            # open handle.  The original car is a game file the manager never renames; the
+            # renderer opens it read-only (sharing reads) and its identity is checked after.
             copied = folder / 'mod.zip'
             if digest_copy(req.source, copied, lambda: self._check(req)) != mod_hash:
-                raise OSError(t('文件已变更'))
-            original = folder / 'original.zip' if req.original else None
-            if original and digest_copy(req.original, original, lambda: self._check(req)) != base_hash:
-                raise OSError(t('文件已变更'))
+                # digest_copy already rejects files that change while being read, so a
+                # mismatch here means the index was stale, not that the mod is broken.
+                self.hashes.forget(req.signature[0])
+                raise StaleHash()
+            original = req.original
             output = folder / 'preview.png'
             job = folder / 'request.json'
             job.write_text(json.dumps({'Input': str(copied), 'BaseArchive': str(original) if original else None,
@@ -297,14 +375,18 @@ class ThumbnailService:
                     proc = subprocess.Popen([str(self.renderer), '--fh6-thumbnail-request', str(job)],
                         cwd=str(self.renderer.parent), stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                         env=renderer_environment(folder / 'startup.log'),
-                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+                                      | getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0))
                 self.process = proc
                 started = time.monotonic()
+                checks = 0
                 try:
                     while proc.poll() is None:
                         self._check(req)
-                        if self.running():
+                        # Enumerating processes costs more than the cheap pause checks; about once a second.
+                        if checks % 3 == 0 and self.running():
                             raise Paused()
+                        checks += 1
                         if time.monotonic()-started > self.timeout:
                             raise TimeoutError(t('渲染超时\n') + renderer_failure(258, folder))
                         self.closed.wait(.35)
@@ -316,6 +398,8 @@ class ThumbnailService:
                     proc.wait(timeout=10)
                     self.process = None
             self._check(req)
+            if original and stamp(original) != req.signature[1]:
+                raise OSError(t('文件已变更'))
             if not valid_png(output):
                 raise RuntimeError(t('渲染组件没有输出有效 PNG'))
             os.replace(output, target)
@@ -324,6 +408,7 @@ class ThumbnailService:
             return target, '已生成'
 
     def _work(self):
+        background_thread()
         while not self.closed.is_set():
             try:
                 req = self.tasks.get(timeout=.25)
