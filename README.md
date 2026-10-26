@@ -1,7 +1,7 @@
 # FH6 Car Mod Manager
 
-**《极限竞速：地平线 6》车辆模组管理器 · v0.8.5**  
-**Forza Horizon 6 Car Mod Manager · v0.8.5**
+**《极限竞速：地平线 6》车辆模组管理器 · v0.8.6**  
+**Forza Horizon 6 Car Mod Manager · v0.8.6**
 
 在一个窗口中导入、启用、切换和删除车辆模组，通过缩略图宫格区分不同车辆及同名模组版本。  
 Import, enable, switch and delete car mods in one window. Thumbnail cards help you distinguish vehicles and different versions of the same mod.
@@ -157,6 +157,19 @@ Automatic cache cleanup does not remove custom pictures. Deleted or replaced mod
 To regenerate just one vehicle’s picture, use **Rebuild preview** instead of clearing the entire cache folder.
 
 ## 更新内容 / Release notes
+
+### v0.8.6 — PCL 风格界面 / PCL-style interface
+
+- 参考 PCL2 的界面库重绘全部界面：PCL 配色，48 px 渐变标题栏与带图标的胶囊页签，当前页为白底蓝字。  
+  Redrew the whole interface after PCL2's UI library: PCL colours, a 48 px gradient title bar with pill-shaped icon tabs, the current page shown as a white pill.
+- 白色侧边栏：筛选项带图标、选中强调条与实时数量。  
+  White sidebar: filters with icons, an accent bar on the selected item and live counts.
+- 卡片采用 6 px 圆角与柔和阴影，悬停时阴影和标题变蓝；模组卡片显示选中勾、状态标签与粗体文件名，宫格居中排列。  
+  Cards have 6 px corners and soft shadows that turn blue on hover; mod cards show a selection check, status pills and bold file names, and the grid is centred.
+- 描边按钮分普通、蓝色和红色（删除）三种并配图标；新增带图标与占位文字的搜索框；滚动条变细，无内容可滚动时自动隐藏。  
+  Outlined buttons in normal, blue and red (delete) styles with icons; a search box with icon and placeholder; slimmer scroll bars that hide when there is nothing to scroll.
+- 修复部分控件调用 `configure()` 时出错的问题。  
+  Fixed an error when calling `configure()` on some controls.
 
 ### v0.8.5 — 动画引擎重写 / Motion engine rewrite
 

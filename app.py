@@ -85,7 +85,7 @@ class Application:
                 pass
         i18n.set_language(self.config.get('language', 'zh'))
         animation.set_enabled(self.config.get('animations', True))  # set "animations": false in settings.json to disable
-        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.5'))
+        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.6'))
         root.geometry(f'1440x{min(960, max(700, root.winfo_screenheight()-80))}')
         root.minsize(1050, 670)
         root.configure(bg=BG)
@@ -127,7 +127,7 @@ class Application:
         self.selection_text = tk.StringVar(value=t('选择一张车辆卡片开始管理'))
         self.status = tk.StringVar(value=t('请在游戏关闭时安装或切换模组'))
 
-        header = GradientHeader(self.root, 'FH6', t('车辆模组管理器'), 'v0.8.5')
+        header = GradientHeader(self.root, 'FH6', t('车辆模组管理器'), 'v0.8.6')
         header.pack(fill='x')
         self.page_buttons = {}
         for key, label, icon in [('mods', t('模组管理'), 'grid'), ('settings', t('设置'), 'gear'), ('help', t('帮助'), 'help')]:
@@ -314,7 +314,7 @@ class Application:
             child.destroy()
         self.buttons = []
         self.build()
-        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.5'))
+        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.6'))
         if self.manager:
             self.folder.set(str(self.manager.folder))
             self.show_vehicle_directory()

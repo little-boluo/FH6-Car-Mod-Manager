@@ -9,7 +9,7 @@ def report(folder, destination):
     size = lambda p: p.stat().st_size
     total = sum(map(size, files))
     renderer = sum(size(p) for p in files if p.relative_to(root).parts[0] == 'renderer')
-    lines = ['FH6 Car Mod Manager 0.8.5 publish inventory',
+    lines = ['FH6 Car Mod Manager 0.8.6 publish inventory',
              f'Total: {total/1024**2:.2f} MiB / {len(files)} files',
              f'Renderer: {renderer/1024**2:.2f} MiB',
              '.NET and Windows App SDK runtimes remain self-contained.',
