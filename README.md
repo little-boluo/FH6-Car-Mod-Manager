@@ -1,7 +1,7 @@
 # FH6 Car Mod Manager
 
-**《极限竞速：地平线 6》车辆模组管理器 · v0.8.4**  
-**Forza Horizon 6 Car Mod Manager · v0.8.4**
+**《极限竞速：地平线 6》车辆模组管理器 · v0.8.5**  
+**Forza Horizon 6 Car Mod Manager · v0.8.5**
 
 在一个窗口中导入、启用、切换和删除车辆模组，通过缩略图宫格区分不同车辆及同名模组版本。  
 Import, enable, switch and delete car mods in one window. Thumbnail cards help you distinguish vehicles and different versions of the same mod.
@@ -157,6 +157,17 @@ Automatic cache cleanup does not remove custom pictures. Deleted or replaced mod
 To regenerate just one vehicle’s picture, use **Rebuild preview** instead of clearing the entire cache folder.
 
 ## 更新内容 / Release notes
+
+### v0.8.5 — 动画引擎重写 / Motion engine rewrite
+
+- 参考 PCL 的动画模块重写动画引擎：全部控件共用一个按帧对齐的时钟，支持 Fluent / Back 缓动与叠加动画；Windows 上动画期间提高系统计时精度，消除 16/31 ms 交替造成的抖动。  
+  Rewrote the animation engine after PCL's animation module: every control shares one frame-aligned clock with Fluent/Back easing and additive tweens; on Windows the system timer resolution is raised while animating, removing 16/31 ms frame jitter.
+- 动画帧不再读取文件；缩略图在后台线程解码缩放，滚动和悬停不再卡顿。游戏进程检测与目录扫描移到后台线程。  
+  Animation frames no longer touch the disk; thumbnails are decoded and scaled on a worker thread, so scrolling and hover stay smooth. Game detection and folder scans run on background threads.
+- 画布元素只在数值变化时重绘，卡片按整像素移动；状态检测不再每秒重设全部按钮和文字，消除周期性闪烁。  
+  Canvas items are only repainted when a value changes and cards move by whole pixels; periodic status checks no longer reconfigure every button and label, removing the once-per-second flicker.
+- 新的 PCL 式动效：页面自上方落入并轻微回弹，卡片依次落入、删除时缩小淡出、其余卡片平滑补位；按钮悬停渐变、按下微缩；侧栏选中项出现强调条；卡片悬停描边加深；滚轮叠加平滑滚动。  
+  New PCL-style motion: pages drop in with a slight overshoot, cards drop in one after another, shrink and fade when removed while the rest glide into place; buttons fade on hover and dip when pressed; the selected sidebar item grows an accent bar; cards deepen their outline on hover; the mouse wheel scrolls smoothly with additive easing.
 
 ### v0.8.4 — 手动缩略图 / Custom previews
 

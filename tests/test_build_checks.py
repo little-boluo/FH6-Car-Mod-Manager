@@ -6,10 +6,37 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from build_checks import smoke_test, validate_environment, check_renderer_resources
+from build_checks import smoke_test, validate_environment, check_renderer_resources, validate_sources
 
 
 class BuildCheckTests(unittest.TestCase):
+    def test_incomplete_extraction_names_all_missing_modules(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            names = ['app.py', 'windows_drop.py', 'windows_ole_drop.py', 'windows_recycle.py']
+            (root / 'SOURCE_FILES.txt').write_text('\n'.join(names), encoding='utf-8')
+            (root / 'app.py').touch()
+            with self.assertRaises(RuntimeError) as error:
+                validate_sources(root)
+            for name in names[1:]: self.assertIn(name, str(error.exception))
+
+    def test_complete_inventory_allows_user_source_edits(self):
+        with tempfile.TemporaryDirectory() as folder, redirect_stdout(io.StringIO()) as output:
+            root = Path(folder)
+            (root / 'SOURCE_FILES.txt').write_text('app.py\n', encoding='utf-8')
+            (root / 'app.py').write_text('# user edits are allowed', encoding='utf-8')
+            validate_sources(root)
+            self.assertIn('OK (1 files)', output.getvalue())
+
+    def test_missing_or_empty_inventory_blocks_build(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            with self.assertRaisesRegex(RuntimeError, 'SOURCE_FILES.txt is missing'):
+                validate_sources(root)
+            (root / 'SOURCE_FILES.txt').touch()
+            with self.assertRaisesRegex(RuntimeError, 'empty'):
+                validate_sources(root)
+
     def test_unicode_and_space_path_passed_as_one_argument(self):
         with tempfile.TemporaryDirectory() as folder:
             executable = Path(folder) / '模组 管理器.exe'

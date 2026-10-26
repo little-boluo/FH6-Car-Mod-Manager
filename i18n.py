@@ -32,7 +32,7 @@ EN = {
     '已处理': 'Processed',
     '导入 {0}/{1} · {2} · {3}% · {4}': 'Import {0}/{1} · {2} · {3}% · {4}',
 
-    'FH6 Car Mod Manager · 车辆模组管理器 0.8.4': 'FH6 Car Mod Manager 0.8.4',
+    'FH6 Car Mod Manager · 车辆模组管理器 0.8.5': 'FH6 Car Mod Manager 0.8.5',
     '上次使用的模组目录 · 运行状态检测中': 'Last mod folder · Checking game status',
     '尚未定位 mediapc\\Cars': 'mediapc\\Cars not located',
     '正在检测游戏目录': 'Locating the game folder',

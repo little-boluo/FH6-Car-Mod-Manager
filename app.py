@@ -18,12 +18,30 @@ from windows_drop import WindowsDrop
 from mod_grid import ModGrid
 from thumbnails import ThumbnailService, stamp
 import animation
-from animation import Animator
+from animation import Animator, out_fluent, out_back, MIDDLE
 from motion_widgets import MotionProgress, DropHighlight
 import i18n
 from i18n import t
 
-from ui_theme import BG, PANEL, TEXT, MUTED, ACCENT, BORDER, Card, ScrollPage, RoundedNavButton, setup_style
+from ui_theme import BG, PANEL, TEXT, MUTED, ACCENT, BORDER, Card, ScrollPage, RoundedNavButton, MotionButton, setup_style
+
+
+def update_widget(widget, **options):
+    """Configure only options whose value really changes.
+
+    Reconfiguring a Tk widget repaints it even when nothing changed; doing that
+    for every control on each periodic status check made the window flicker."""
+    try:
+        changed = {k: v for k, v in options.items() if str(widget.cget(k)) != str(v)}
+    except tk.TclError:
+        changed = options
+    if changed:
+        widget.configure(**changed)
+
+
+def set_var(variable, value):
+    if variable.get() != value:
+        variable.set(value)
 
 
 def size_text(n):
@@ -44,6 +62,11 @@ class Application:
         self.drop = None
         self.jobs = queue.Queue()
         self.progress_events = queue.Queue()
+        # Periodic checks run on worker threads so they never stall a frame.
+        self.game_events = queue.Queue()
+        self.watch_events = queue.Queue()
+        self._probe_busy = self._watch_busy = False
+        self._probe_epoch = 0
         self.removing = None
         self.rows = {}
         self.config = {}
@@ -60,7 +83,7 @@ class Application:
                 pass
         i18n.set_language(self.config.get('language', 'zh'))
         animation.set_enabled(self.config.get('animations', True))  # set "animations": false in settings.json to disable
-        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.4'))
+        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.5'))
         root.geometry(f'1440x{min(960, max(700, root.winfo_screenheight()-80))}')
         root.minsize(1050, 670)
         root.configure(bg=BG)
@@ -85,14 +108,14 @@ class Application:
         setup_style(self.root)
 
     def button(self, parent, text, command, accent=False):
-        b = ttk.Button(parent, text=text, command=command, style='Accent.TButton' if accent else 'TButton', cursor='hand2')
+        b = MotionButton(parent, text=text, command=command, style='Accent.TButton' if accent else 'TButton')
         self.buttons.append(b)
         return b
 
     def build(self):
         self.page = 'mods'
         self.page_anim = Animator(self.root, self._slide_frame)
-        self.slide_page = None
+        self.slide_page, self._slide_y = None, 0
         self.view_filter = 'all'
         self.folder = tk.StringVar(value=t('尚未定位 mediapc\\Cars'))
         self.location_info = tk.StringVar(value=t('正在检测游戏目录'))
@@ -107,7 +130,7 @@ class Application:
         header.pack_propagate(False)
         tk.Label(header, text='FH6', font=('Segoe UI', 22, 'bold'), bg=ACCENT, fg='white').pack(side='left', padx=(24, 12))
         tk.Label(header, text=t('车辆模组管理器'), font=('Microsoft YaHei UI', 11), bg=ACCENT, fg='#e1efff').pack(side='left')
-        tk.Label(header, text='v0.8.4', bg=ACCENT, fg='#d6e9ff', font=('Segoe UI', 10)).pack(side='right', padx=24)
+        tk.Label(header, text='v0.8.5', bg=ACCENT, fg='#d6e9ff', font=('Segoe UI', 10)).pack(side='right', padx=24)
         navigation = tk.Frame(header, bg=ACCENT)
         navigation.pack(side='right', padx=24)
         self.page_buttons = {}
@@ -284,7 +307,7 @@ class Application:
             child.destroy()
         self.buttons = []
         self.build()
-        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.4'))
+        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.5'))
         if self.manager:
             self.folder.set(str(self.manager.folder))
             self.show_vehicle_directory()
@@ -298,7 +321,7 @@ class Application:
 
     PAGE_ORDER = ('mods', 'settings', 'help')
     PAGE_PAD = (22, 20)
-    SLIDE_PX = 22
+    PAGE_DROP = 16
 
     def show_page(self, key):
         if self.locked() or key not in self.pages:
@@ -307,38 +330,42 @@ class Application:
         if previous == key:
             # Clicking the selected tab must not unmap/remap its native children.
             return
-        self.page_anim.cancel('slide')
-        old, page = self.pages[previous], self.pages[key]
+        self.page_anim.stop()
+        page = self.pages[key]
         px, py = self.PAGE_PAD
-        old.place_configure(x=px, y=py)
-        for name, other in self.pages.items():
-            if name not in (previous, key):
-                other.place_forget()
         self.page = key
         for name, button in self.page_buttons.items():
             self.style_navigation(button, name == key)
-        direction = 1 if self.PAGE_ORDER.index(key) > self.PAGE_ORDER.index(previous) else -1
-        offset = direction * self.SLIDE_PX if animation.ENABLED else 0
-        self.slide_page = page
-        # Retain the outgoing page underneath until the incoming page is painted.
-        # Geometry and size stay identical throughout and after the transition.
-        page.place(x=px + offset, y=py, relwidth=1, width=-2*px, relheight=1, height=-2*py)
+        offset = -self.PAGE_DROP if animation.ENABLED else 0
+        self.slide_page = page if offset else None
+        self._slide_y = offset
+        # PCL page enter: the new page drops in from 16 px above with a slight
+        # overshoot.  Size never changes, only the y offset of one frame.
+        page.place(x=px, y=py + offset, relwidth=1, width=-2*px, relheight=1, height=-2*py)
         page.tkraise()
-        self.page_anim.to('slide', 0.0, 240, start=offset, done=lambda: self._slide_done(page))
+        # Lay the incoming page out before anything moves, then drop the old page
+        # in the same frame: no half-built page and no old page behind the new one.
+        page.update_idletasks()
+        for other in self.pages.values():
+            if other is not page:
+                other.place_forget()
         if key == 'mods':
             self.tree.redraw()
+        if offset:
+            self.page_anim.set('slide', offset)
+            self.page_anim.add('slide', 5, 250, out_fluent(MIDDLE))
+            self.page_anim.add('slide', 11, 350, out_back(MIDDLE), done=lambda: self._slide_done(page))
 
     def _slide_frame(self):
         page = self.slide_page
-        if page is not None and page.winfo_exists():
-            page.place_configure(x=self.PAGE_PAD[0] + round(self.page_anim.get('slide')))
+        y = round(self.page_anim.get('slide'))
+        if page is not None and y != self._slide_y and page.winfo_exists():
+            self._slide_y = y
+            page.place_configure(y=self.PAGE_PAD[1] + y)
 
     def _slide_done(self, page):
         if page.winfo_exists() and page is self.pages.get(self.page):
-            page.place_configure(x=self.PAGE_PAD[0])
-            for other in self.pages.values():
-                if other is not page:
-                    other.place_forget()
+            page.place_configure(x=self.PAGE_PAD[0], y=self.PAGE_PAD[1])
             self.slide_page = None
 
     def set_filter(self, key):
@@ -378,7 +405,7 @@ class Application:
             self.drop_highlight.hide(immediate=True)
         self.buttons = [b for b in self.buttons if b.winfo_exists()]
         for b in self.buttons:
-            b.configure(state='disabled' if locked else 'normal')
+            update_widget(b, state='disabled' if locked else 'normal')
         for name, button in getattr(self, 'page_buttons', {}).items():
             self.style_navigation(button, name == self.page)
         if hasattr(self, 'thumbnails'):
@@ -386,8 +413,8 @@ class Application:
             if not locked:
                 self.tree.redraw()
         if hasattr(self, 'language_box'):
-            self.language_box.configure(state='disabled' if locked else 'readonly')
-        self.search_entry.configure(state='disabled' if locked else 'normal')
+            update_widget(self.language_box, state='disabled' if locked else 'readonly')
+        update_widget(self.search_entry, state='disabled' if locked else 'normal')
         self.tree.state(['disabled'] if locked else ['!disabled'])
         self.tree.tag_configure('enabled', foreground='#6e7b8e' if locked else '#82dfb1')
         self.tree.tag_configure('disabled', foreground='#6e7b8e' if locked else '#9eacc1')
@@ -398,24 +425,25 @@ class Application:
                  t('正在处理文件，请稍候') if self.busy else
                  t('将车辆 ZIP 拖入此窗口，即可安装') if self.drop else
                  t('点击「导入 ZIP」安装车辆模组'))
-        self.drop_title.configure(text=title, fg=MUTED if locked else TEXT)
+        update_widget(self.drop_title, text=title, fg=MUTED if locked else TEXT)
 
     def apply_game_state(self, running, error=''):
         self.game_running, self.game_error = running, error
         if running is True:
-            self.game_status.set(t('● FH6 正在运行 · 全部按钮、设置及拖放已锁定；退出游戏后自动恢复'))
-            self.game_label.configure(foreground='#c76b35')
+            set_var(self.game_status, t('● FH6 正在运行 · 全部按钮、设置及拖放已锁定；退出游戏后自动恢复'))
+            update_widget(self.game_label, foreground='#c76b35')
         elif running is False:
-            self.game_status.set(t('● FH6 未运行 · 可以管理模组'))
-            self.game_label.configure(foreground='#278c74')
+            set_var(self.game_status, t('● FH6 未运行 · 可以管理模组'))
+            update_widget(self.game_label, foreground='#278c74')
         else:
-            self.game_status.set(t('● 无法确认游戏状态，操作已锁定，正在自动重试') if error else t('正在检查游戏运行状态…'))
-            self.game_label.configure(foreground='#a67d29')
+            set_var(self.game_status, t('● 无法确认游戏状态，操作已锁定，正在自动重试') if error else t('正在检查游戏运行状态…'))
+            update_widget(self.game_label, foreground='#a67d29')
         if running is not False:
             self.pending_drops.clear()
         self.apply_controls()
 
     def probe_game(self):
+        self._probe_epoch = getattr(self, '_probe_epoch', 0) + 1  # older background results are stale
         try:
             self.apply_game_state(game_is_running())
         except Exception as exc:
@@ -424,10 +452,31 @@ class Application:
             self.apply_game_state(None, str(exc))
 
     def check_game(self):
-        self.probe_game()
+        """Enumerate processes off the UI thread once a second; poll() applies the result."""
+        if not self._probe_busy:
+            self._probe_busy = True
+            epoch = self._probe_epoch
+            def work():
+                try:
+                    self.game_events.put((epoch, game_is_running(), None))
+                except Exception as exc:
+                    self.game_events.put((epoch, None, exc))
+            threading.Thread(target=work, name='game-probe', daemon=True).start()
+        self.root.after(1000, self.check_game)
+
+    def _game_checked(self, epoch, running, exc):
+        self._probe_busy = False
+        if epoch == self._probe_epoch:
+            error = ''
+            if exc is not None:
+                error = str(exc)
+                if error != self.game_error:
+                    self.log(exc)
+                running = None
+            if (running, error) != (self.game_running, self.game_error):
+                self.apply_game_state(running, error)  # unchanged results touch no widgets
         if self.game_running is False and not self.busy and self.startup_detection_pending:
             self.root.after_idle(self.auto_detect)
-        self.root.after(1000, self.check_game)
 
     def can_edit(self):
         if self.busy:
@@ -473,6 +522,13 @@ class Application:
     def poll(self):
         if hasattr(self, 'thumbnails') and self.thumbnails.drain():
             self.tree.redraw()
+        for events, handler in ((getattr(self, 'game_events', None), self._game_checked),
+                                (getattr(self, 'watch_events', None), self._watched)):
+            while events is not None:
+                try:
+                    handler(*events.get_nowait())
+                except queue.Empty:
+                    break
         latest = None
         if hasattr(self, 'progress_events'):
             while True:
@@ -697,24 +753,39 @@ class Application:
         text = t('{0} 个文件  /  {1} 个已启用  /  {2} 个已禁用  /  {3} 组多版本').format(len(self.rows), enabled, len(self.rows)-enabled, sum(c > 1 for c in counts.values()))
         if conflicts:
             text += t('  ·  {0} 组有多个启用文件，请选择要保留启用的版本').format(conflicts)
-        self.stats.set(text)
+        set_var(self.stats, text)
         self.selected()
 
     def selected(self, *_):
         ids = self.tree.selection()
         r = self.rows.get(ids[0]) if ids else None
         self.toggle_btn.configure(text=t('停用所选版本') if r and r.enabled else t('启用所选版本'))
-        self.selection_text.set(r.filename if r else t('单击卡片选择，双击切换启用；同名版本只启用一个'))
+        set_var(self.selection_text, r.filename if r else t('单击卡片选择，双击切换启用；同名版本只启用一个'))
 
     def watch(self):
-        if not self.busy and self.manager:
-            try:
-                current = [(r.filename, r.size, r.modified) for r in self.manager.scan()]
-                if current != self.auto_signature:
-                    self.refresh()
-            except OSError:
-                self.status.set(t('目录暂时不可访问，请检查磁盘连接'))
+        """Scan the mod folder off the UI thread every two seconds; refresh only on change."""
+        if not self.busy and self.manager and not self._watch_busy:
+            self._watch_busy = True
+            manager = self.manager
+            def work():
+                try:
+                    result = [(r.filename, r.size, r.modified) for r in manager.scan()]
+                except Exception as exc:
+                    result = exc
+                self.watch_events.put((manager, result))
+            threading.Thread(target=work, name='folder-watch', daemon=True).start()
         self.root.after(2000, self.watch)
+
+    def _watched(self, manager, result):
+        self._watch_busy = False
+        if self.busy or manager is not self.manager:
+            return
+        if isinstance(result, OSError):
+            self.status.set(t('目录暂时不可访问，请检查磁盘连接'))
+        elif isinstance(result, Exception):
+            self.log(result)
+        elif result != self.auto_signature:
+            self.refresh()
 
     def thumbnail_for(self, filename):
         r = self.rows.get(filename)
