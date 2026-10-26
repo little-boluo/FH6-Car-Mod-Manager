@@ -9,6 +9,7 @@ app.py
 build_checks.py
 build_windows.ps1
 cache_storage.py
+content_index.py
 core.py
 discovery.py
 i18n.py
