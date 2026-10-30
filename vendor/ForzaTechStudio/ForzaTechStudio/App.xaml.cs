@@ -14,6 +14,28 @@ namespace ForzaTechStudio
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern int MessageBox(IntPtr hWnd, String text, String caption, int options);
 
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int index);
+
+        /// <summary>
+        /// FH6 Car Mod Manager: the 3D view only starts inside a shown window, but nobody needs to
+        /// see it. Place the window beyond every monitor before it first appears and keep it out of
+        /// the taskbar and Alt+Tab; the thumbnail is read from the render target, not the screen.
+        /// Set FH6MM_RENDER_VISIBLE=1 to get the visible window back for troubleshooting.
+        /// </summary>
+        private static void HideRendererWindow(Microsoft.UI.Windowing.AppWindow window, int width)
+        {
+            if (Environment.GetEnvironmentVariable("FH6MM_RENDER_VISIBLE") == "1")
+                return;
+            try { window.IsShownInSwitchers = false; }
+            catch (Exception ex) { RendererDiagnostics.Write("Could not hide renderer from taskbar: " + ex.Message); }
+            // Left of the leftmost monitor (virtual-screen coordinates can be negative).
+            int virtualLeft = GetSystemMetrics(76 /* SM_XVIRTUALSCREEN */);
+            int virtualTop = GetSystemMetrics(77 /* SM_YVIRTUALSCREEN */);
+            window.Move(new Windows.Graphics.PointInt32(virtualLeft - width - 200, virtualTop));
+            RendererDiagnostics.Write("Renderer window placed off-screen");
+        }
+
         public static Window MainWindow { get; private set; } = null!;
 #if !FH6_THUMBNAIL
         public static AppearanceService AppearanceService { get; } = AppearanceService.Instance;
@@ -73,6 +95,7 @@ namespace ForzaTechStudio
                     var page = new ForzaTechStudio.Views.ViewportPage();
                     MainWindow.Content = page;
                     MainWindow.AppWindow.Resize(new Windows.Graphics.SizeInt32(1000, 720));
+                    HideRendererWindow(MainWindow.AppWindow, 1000);
                     bool started = false;
                     page.Loaded += async (_, _) =>
                     {
