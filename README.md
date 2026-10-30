@@ -170,6 +170,8 @@ To regenerate just one vehicle’s picture, use **Rebuild preview** instead of c
   Cached previews are stored as optimised 512×288 PNGs, about half the previous size; older cached previews shrink the next time they are shown.
 - 渲染组件以较低优先级运行，屏幕上可见的卡片优先生成。  
   The renderer runs at lower priority, and cards on screen are generated first.
+- 生成缩略图时不再弹出渲染窗口：窗口放在所有显示器之外，也不出现在任务栏和 Alt+Tab 中。排查问题时可设置环境变量 `FH6MM_RENDER_VISIBLE=1` 让窗口照常显示。  
+  Generating previews no longer pops up the renderer window: it stays beyond every monitor and out of the taskbar and Alt+Tab. Set the environment variable `FH6MM_RENDER_VISIBLE=1` to show it again when troubleshooting.
 - 更新后渲染组件已更换，已有缩略图会按新组件重新生成一次。  
   Because the renderer changed, existing previews are regenerated once with the new renderer.
 
