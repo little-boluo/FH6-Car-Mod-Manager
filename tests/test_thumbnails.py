@@ -255,6 +255,68 @@ class ThumbnailEfficiencyTests(unittest.TestCase):
         self.restart()
         self.assertEqual(self.service.hashes.entries, {})
 
+    def render_picture(self, path, flat=False):
+        # Like a renderer capture: opaque RGBA, shaded surfaces with fine noise.
+        from PIL import Image, ImageChops, ImageDraw
+        image = Image.new('RGBA', (640, 360), (19, 25, 37, 255))
+        draw = ImageDraw.Draw(image)
+        draw.ellipse((150, 90, 490, 300), fill=(210, 214, 222, 255))
+        if not flat:
+            noise = Image.effect_noise((640, 360), 18).convert('RGB')
+            shaded = ImageChops.add(image.convert('RGB'), noise, scale=1.6, offset=-40)
+            image = Image.merge('RGBA', (*shaded.split(), Image.new('L', (640, 360), 255)))
+        image.save(path)
+
+    def big_renderer(self, command, **kwargs):
+        test = self
+        class Process:
+            returncode = 0
+            def __init__(self):
+                job = json.loads(Path(command[-1]).read_text(encoding='utf-8'))
+                test.render_picture(job['Output'])
+                test.raw_size = Path(job['Output']).stat().st_size
+            def poll(self): return 0
+            def wait(self, **kwargs): return 0
+        return Process()
+
+    def test_rendered_preview_is_stored_at_grid_size(self):
+        from PIL import Image
+        with patch('thumbnails.subprocess.Popen', side_effect=self.big_renderer):
+            path, _ = self.service._generate(self.req())
+        with Image.open(path) as image:
+            self.assertEqual((image.size, image.mode), ((512, 288), 'RGB'))
+        self.assertLess(path.stat().st_size, self.raw_size)
+        self.assertTrue(valid_png(path))
+        self.assertFalse(list(self.service.cache.glob('compact-*')))
+
+    def test_previews_cached_by_older_versions_shrink_on_next_use(self):
+        from PIL import Image
+        with patch('thumbnails.subprocess.Popen', side_effect=self.big_renderer), \
+                patch('thumbnails.compact_preview', return_value=False):
+            path, _ = self.service._generate(self.req())
+        with Image.open(path) as image:
+            self.assertEqual(image.size, (640, 360))
+        with patch('thumbnails.subprocess.Popen') as popen:
+            again, _ = self.service._generate(self.req())
+        popen.assert_not_called()
+        self.assertEqual(again, path)
+        with Image.open(path) as image:
+            self.assertEqual(image.size, (512, 288))
+
+    def test_compaction_never_makes_a_preview_larger(self):
+        from thumbnails import compact_preview
+        flat = self.root / 'flat.png'; self.render_picture(flat, flat=True)
+        before = flat.read_bytes()
+        compact_preview(flat)
+        self.assertLessEqual(flat.stat().st_size, len(before))
+
+    def test_small_or_unreadable_previews_are_left_alone(self):
+        from thumbnails import compact_preview
+        small = self.root / 'small.png'; small.write_bytes(png_bytes())
+        broken = self.root / 'broken.png'; broken.write_bytes(b'\x89PNG broken')
+        self.assertFalse(compact_preview(small)); self.assertEqual(small.read_bytes(), png_bytes())
+        self.assertFalse(compact_preview(broken)); self.assertEqual(broken.read_bytes(), b'\x89PNG broken')
+
     def test_recent_requests_go_first_and_same_moment_keeps_order(self):
         from thumbnails import RecentFirstQueue
         queue_, now = RecentFirstQueue(), [100.0]

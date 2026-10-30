@@ -15,6 +15,10 @@ namespace ForzaTechStudio.Services;
 
 public sealed class SwatchbinArchiveService
 {
+    // The thumbnail renderer is a short-lived process that looks up hundreds of textures in a
+    // handful of archives; keep those archives indexed instead of re-parsing them per lookup.
+    private static readonly bool UseIndexCache = ThumbnailJob.Enabled;
+
     public Task<IReadOnlyList<SwatchbinArchiveEntry>> LoadZipTextureEntriesAsync(string zipPath, CancellationToken cancellationToken = default)
     {
         return Task.Run(() => LoadZipTextureEntries(zipPath, cancellationToken), cancellationToken);
@@ -242,6 +246,13 @@ public sealed class SwatchbinArchiveService
     {
         string normalizedEntryName = NormalizeArchiveEntryName(entryName);
 
+        if (UseIndexCache)
+        {
+            var index = ZipIndexCache.Get(zipPath);
+            if (index != null)
+                return index.Entries.ContainsKey(normalizedEntryName);
+        }
+
         try
         {
             using var customZip = new CustomZipFile(zipPath);
@@ -293,6 +304,19 @@ public sealed class SwatchbinArchiveService
     {
         data = Array.Empty<byte>();
         string normalizedEntryName = NormalizeArchiveEntryName(entryName);
+
+        if (UseIndexCache && ZipIndexCache.TryFind(zipPath, normalizedEntryName, out var index, out var cached))
+        {
+            try
+            {
+                data = index!.Zip.ExtractToMemory(cached!);
+                return true;
+            }
+            catch
+            {
+                data = Array.Empty<byte>(); // fall back to the original lookups below
+            }
+        }
 
         try
         {

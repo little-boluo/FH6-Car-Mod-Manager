@@ -1,7 +1,7 @@
 # FH6 Car Mod Manager
 
-**《极限竞速：地平线 6》车辆模组管理器 · v0.8.6**  
-**Forza Horizon 6 Car Mod Manager · v0.8.6**
+**《极限竞速：地平线 6》车辆模组管理器 · v0.8.7**  
+**Forza Horizon 6 Car Mod Manager · v0.8.7**
 
 在一个窗口中导入、启用、切换和删除车辆模组，通过缩略图宫格区分不同车辆及同名模组版本。  
 Import, enable, switch and delete car mods in one window. Thumbnail cards help you distinguish vehicles and different versions of the same mod.
@@ -157,6 +157,21 @@ Automatic cache cleanup does not remove custom pictures. Deleted or replaced mod
 To regenerate just one vehicle’s picture, use **Rebuild preview** instead of clearing the entire cache folder.
 
 ## 更新内容 / Release notes
+
+### v0.8.7 — 缩略图提速与省空间 / Faster thumbnails, less disk
+
+- 已生成过的缩略图在重启后直接显示，不再每次启动重新读取全部模组和原版车辆文件（文件内容摘要按文件身份持久记录）。  
+  Previews that already exist appear right after a restart; content hashes are remembered per file, so launches no longer re-read every mod and original car.
+- 原版车辆 ZIP 不再复制到临时目录；渲染组件只合并缩略图实际用到的文件（模型、材质、贴图），并直接复制已压缩的数据，不再解压后重新压缩。  
+  The original car ZIP is no longer copied; the renderer merges only the files a thumbnail uses (models, materials, textures) and copies their compressed data as is instead of decompressing and recompressing.
+- 渲染组件只解析一次每个 ZIP 的目录，游戏贴图并行解码，贴图最大使用 1024 px 的 mip 级别，内存与显存占用更低。  
+  The renderer parses each ZIP directory once, decodes game textures in parallel and uses texture mip levels up to 1024 px, lowering memory and video memory use.
+- 缓存的缩略图以 512×288 优化 PNG 保存，约为原来的一半大小；旧缓存在下次显示时自动压缩。  
+  Cached previews are stored as optimised 512×288 PNGs, about half the previous size; older cached previews shrink the next time they are shown.
+- 渲染组件以较低优先级运行，屏幕上可见的卡片优先生成。  
+  The renderer runs at lower priority, and cards on screen are generated first.
+- 更新后渲染组件已更换，已有缩略图会按新组件重新生成一次。  
+  Because the renderer changed, existing previews are regenerated once with the new renderer.
 
 ### v0.8.6 — PCL 风格界面 / PCL-style interface
 

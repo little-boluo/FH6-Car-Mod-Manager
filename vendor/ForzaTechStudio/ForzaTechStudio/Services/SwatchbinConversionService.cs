@@ -96,6 +96,8 @@ public class SwatchbinConversionService
     // Loads a swatchbin from raw bytes and returns render-ready DDS data,
     // detiling Durango textures automatically.
 
+    private static readonly int ThumbnailTextureLimit = ThumbnailJob.Enabled ? 1024 : 0;
+
     public byte[]? LoadRenderReadyDdsFromBytes(byte[] swatchbinBytes)
     {
         if (swatchbinBytes == null || swatchbinBytes.Length == 0)
@@ -103,7 +105,9 @@ public class SwatchbinConversionService
 
         using var stream = new MemoryStream(swatchbinBytes, writable: false);
         var info = _swatchbinService.LoadSwatchbin(stream);
-        return GetRenderReadyDdsData(info);
+        var dds = GetRenderReadyDdsData(info);
+        // FH6 Car Mod Manager: a 640x360 thumbnail never samples levels above 1024 px.
+        return dds != null && ThumbnailTextureLimit > 0 ? DdsMipTrimmer.Trim(dds, ThumbnailTextureLimit) : dds;
     }
 
     // Public conversion entry-points 

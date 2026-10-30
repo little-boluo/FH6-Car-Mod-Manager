@@ -160,6 +160,7 @@ vendor/ForzaTechStudio/ForzaTechStudio/Services/SwatchbinConversionService.cs
 vendor/ForzaTechStudio/ForzaTechStudio/Services/SwatchbinPreviewService.cs
 vendor/ForzaTechStudio/ForzaTechStudio/Services/SwatchbinService.cs
 vendor/ForzaTechStudio/ForzaTechStudio/Services/TextureImageExporter.cs
+vendor/ForzaTechStudio/ForzaTechStudio/Services/ThumbnailArchive.cs
 vendor/ForzaTechStudio/ForzaTechStudio/Services/VLayAnalysisDatabaseService.cs
 vendor/ForzaTechStudio/ForzaTechStudio/Services/VLayLibrary.cs
 vendor/ForzaTechStudio/ForzaTechStudio/Services/VLayPatternAdvisor.cs

@@ -154,8 +154,9 @@ public sealed partial class ViewportPage
     {
         RendererDiagnostics.Write("Waiting for Direct3D render host");
         // Wait for Direct3D initialization, then render explicitly.
-        for (int i = 0; i < 100 && _viewport.RenderHost?.IsRendering != true; i++)
-            await Task.Delay(100);
+        // Same 10 s limit as before, polled finely so a ready host is used immediately.
+        for (int i = 0; i < 500 && _viewport.RenderHost?.IsRendering != true; i++)
+            await Task.Delay(20);
         var host = _viewport.RenderHost;
         if (host?.IsRendering != true) throw new InvalidOperationException("Direct3D render host did not start.");
     }

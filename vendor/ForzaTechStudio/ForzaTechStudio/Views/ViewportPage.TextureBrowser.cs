@@ -338,9 +338,10 @@ namespace ForzaTechStudio.Views
 
                 if (textureSource?.IsConfigured == true)
                 {
-                    foreach (string path in gameTexturePaths)
+                    // Lookups share thread-safe caches; decoding (detiling, DDS building) dominates,
+                    // so game textures decode in parallel like local ones.
+                    Parallel.ForEach(gameTexturePaths, parallelOptions, path =>
                     {
-                        if (ct.IsCancellationRequested) return;
                         try
                         {
                             foreach (string candidate in BuildViewportGameTexturePathCandidates(textureSource.GameId, path))
@@ -372,7 +373,7 @@ namespace ForzaTechStudio.Views
                         catch { /* skip */ }
                         int done = Interlocked.Increment(ref completedWork);
                         DispatcherQueue.TryEnqueue(() => LoadingDetail = $"Loading textures... ({done} / {totalWork})");
-                    }
+                    });
                 }
             }, ct);
 

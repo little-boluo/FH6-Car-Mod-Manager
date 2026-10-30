@@ -41,7 +41,7 @@
     <AssemblyName>ForzaTech Studio</AssemblyName>
     <Title>FH6 Thumbnail Renderer</Title>
     <Description>Dedicated vehicle thumbnail build; no FTS main editor shell</Description>
-    <Version>0.8.1</Version>
+    <Version>0.8.7</Version>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <OutputPath>bin\FH6ThumbnailRenderer\</OutputPath>
@@ -84,6 +84,7 @@
     <Compile Include="Services\ConversionOptions.cs" />
     <Compile Include="Services\ConversionService.cs" />
     <Compile Include="Services\CustomZipFile.cs" />
+    <Compile Include="Services\ThumbnailArchive.cs" />
     <Compile Include="Services\FbxExportService.cs" />
     <Compile Include="Services\FileService.cs" />
     <Compile Include="Services\ForzaGameCatalog.cs" />

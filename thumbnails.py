@@ -57,6 +57,47 @@ def valid_png(path):
         return False
 
 
+PREVIEW_WIDTH = 512  # cards show previews 342 px wide; 512 still covers 150 % display scaling
+
+
+def compact_preview(path):
+    """Store a rendered preview at the size the grid can use, as an optimised PNG.
+
+    The renderer captures 640x360 with an all-opaque alpha channel; keeping that
+    roughly doubled the cache on disk for no visible gain.  Returns True when the
+    file was rewritten; on any problem the original file is left untouched."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return False
+    path = Path(path)
+    temporary = None
+    try:
+        with Image.open(path) as image:
+            if image.format != 'PNG' or image.width <= PREVIEW_WIDTH:
+                return False
+            image.load()
+            if 'A' in image.getbands() and image.getchannel('A').getextrema() == (255, 255):
+                image = image.convert('RGB')
+            elif image.mode not in ('RGB', 'RGBA'):
+                image = image.convert('RGBA' if 'A' in image.getbands() else 'RGB')
+            size = (PREVIEW_WIDTH, max(16, round(image.height * PREVIEW_WIDTH / image.width)))
+            small = image.resize(size, getattr(Image, 'Resampling', Image).LANCZOS)
+        fd, temporary = tempfile.mkstemp(prefix='compact-', suffix='.tmp', dir=path.parent)
+        os.close(fd)
+        small.save(temporary, 'PNG', optimize=True)
+        # Flat synthetic pictures can grow after resampling; only ever trade down.
+        if not valid_png(temporary) or os.path.getsize(temporary) >= path.stat().st_size:
+            return False
+        os.replace(temporary, path)
+        return True
+    except (OSError, ValueError):
+        return False
+    finally:
+        if temporary is not None:
+            Path(temporary).unlink(missing_ok=True)
+
+
 def digest_copy(source, destination=None, check=lambda: None):
     before = stamp(source)
     h = hashlib.sha256()
@@ -346,6 +387,7 @@ class ThumbnailService:
         target = self.cache / (key + '.png')
         if valid_png(target) and not req.force and (not self.force_generation or key in self.regenerated):
             self._check(req)
+            compact_preview(target)  # previews cached by older versions shrink once
             os.utime(target, ns=(time.time_ns(), target.stat().st_mtime_ns))
             return target, '已生成'
         with tempfile.TemporaryDirectory(prefix='render-', dir=self.cache) as folder:
@@ -402,6 +444,7 @@ class ThumbnailService:
                 raise OSError(t('文件已变更'))
             if not valid_png(output):
                 raise RuntimeError(t('渲染组件没有输出有效 PNG'))
+            compact_preview(output)
             os.replace(output, target)
             prune_cache(self.cache, protected=(target,))
             self.regenerated.add(key)

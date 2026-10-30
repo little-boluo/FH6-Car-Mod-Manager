@@ -66,6 +66,16 @@ internal sealed class ThumbnailJob
         CheckGame();
         if (string.IsNullOrWhiteSpace(BaseArchive) || !File.Exists(BaseArchive)) return Input;
         string merged = Path.Combine(Path.GetDirectoryName(Output)!, "scene.zip");
+        // Enumerating processes per entry made the merge itself slow; a few checks a second suffice
+        // (the manager also stops the renderer as soon as the game starts).
+        var clock = Stopwatch.StartNew();
+        long lastCheck = long.MinValue / 2;
+        void CheckGameThrottled()
+        {
+            if (clock.ElapsedMilliseconds - lastCheck < 250) return;
+            lastCheck = clock.ElapsedMilliseconds;
+            CheckGame();
+        }
         await Task.Run(() =>
         {
             using var basis = new CustomZipFile(BaseArchive);
@@ -80,6 +90,9 @@ internal sealed class ThumbnailJob
                     if (name.Split('/').Any(p => p == "..") || name.Contains(':'))
                         throw new InvalidDataException("Unsafe ZIP entry path.");
                     if (!seen.Add(name)) throw new InvalidDataException("Ambiguous duplicate ZIP entry: " + name);
+                    // Only what the thumbnail actually reads goes into the scene (audio and other
+                    // data never did anything here but cost time and temporary disk space).
+                    if (!ThumbnailArchive.IsRenderEntry(name)) continue;
                     if (entry.CompressionMethod is not (0 or 8 or 21))
                         throw new InvalidDataException("Unsupported ZIP compression: " + entry.CompressionMethod);
                     if (entry.UncompressedSize > 512L*1024*1024)
@@ -89,12 +102,25 @@ internal sealed class ThumbnailJob
             }
             if (files.Count > 60000 || files.Values.Sum(v => (long)v.Entry.UncompressedSize) > 4L*1024*1024*1024)
                 throw new InvalidDataException("Vehicle archive exceeds thumbnail limits.");
-            using var target = new ZipArchive(File.Create(merged), ZipArchiveMode.Create);
-            foreach (var (name, item) in files)
+            var ordered = files.Select(pair => (pair.Key, pair.Value.Zip, pair.Value.Entry)).ToList();
+            try
             {
-                CheckGame();
-                using var stream = target.CreateEntry(name, CompressionLevel.Fastest).Open();
-                item.Zip.ExtractToStream(item.Entry, stream);
+                // Copy each entry's compressed bytes as they are: no inflate/deflate work, and the
+                // scene is never larger than the entries it needs.
+                using var output = new FileStream(merged, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20);
+                ThumbnailArchive.WriteRaw(ordered, output, CheckGameThrottled);
+                RendererDiagnostics.Write($"Scene: {ordered.Count} entries copied without recompression");
+            }
+            catch (InvalidDataException error) when (error.Message.Contains("ZIP64"))
+            {
+                RendererDiagnostics.Write("Scene needs ZIP64; recompressing instead: " + error.Message);
+                using var target = new ZipArchive(File.Create(merged), ZipArchiveMode.Create);
+                foreach (var (name, zip, entry) in ordered)
+                {
+                    CheckGameThrottled();
+                    using var stream = target.CreateEntry(name, CompressionLevel.Fastest).Open();
+                    zip.ExtractToStream(entry, stream);
+                }
             }
         });
         return merged;

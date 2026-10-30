@@ -353,6 +353,38 @@ namespace ForzaTechStudio
             ExtractEntryStreamed(entry.LocalHeaderOffset, entry.CompressedSize, entry.UncompressedSize, entry.CompressionMethod, entry.Name, outputStream, entry.Crc);
         }
 
+        // FH6 Car Mod Manager: copies an entry's stored bytes (still compressed) unchanged.
+        public void CopyRawEntry(ZipEntryInfo entry, Stream outputStream)
+        {
+            lock (_syncLock)
+            {
+                if (entry.LocalHeaderOffset >= _stream.Length)
+                    throw new InvalidDataException($"Local Header Offset out of bounds for {entry.Name}");
+
+                _bs.Position = entry.LocalHeaderOffset;
+                if (_bs.ReadUInt32() != 0x04034b50)
+                    throw new InvalidDataException($"Invalid Local Header Signature for {entry.Name}");
+
+                _bs.Position += 22;
+                ushort nameLen = _bs.ReadUInt16();
+                ushort extraLen = _bs.ReadUInt16();
+                _bs.Position += nameLen + extraLen;
+                if (_bs.Position + entry.CompressedSize > _stream.Length)
+                    throw new InvalidDataException($"Entry data out of bounds for {entry.Name}");
+
+                byte[] buffer = new byte[1 << 20];
+                long remaining = entry.CompressedSize;
+                while (remaining > 0)
+                {
+                    int read = _stream.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+                    if (read <= 0)
+                        throw new EndOfStreamException($"Unexpected end of archive in {entry.Name}");
+                    outputStream.Write(buffer, 0, read);
+                    remaining -= read;
+                }
+            }
+        }
+
         private void ExtractEntryStreamed(uint localHeaderOffset, uint compressedSize, uint uncompressedSize, ushort method, string fileName, Stream outputStream, uint expectedCrc)
         {
             byte[]? compressedData = null;
