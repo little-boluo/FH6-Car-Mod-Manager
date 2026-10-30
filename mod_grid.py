@@ -126,8 +126,18 @@ class PreviewLoader:
             self.pending.discard(key)
             yield key, data
 
-    def close(self):
+    def close(self, wait=.5):
+        """Stop the worker: drop queued work, then give a decode in progress a moment to
+        finish so no thumbnail file stays open after the grid is gone (Windows cannot
+        delete or replace a file another handle still has open)."""
+        try:
+            while True:
+                self.requests.get_nowait()
+        except queue.Empty:
+            pass
         self.requests.put(None)
+        if self.thread is not None and self.thread is not threading.current_thread():
+            self.thread.join(wait)
 
 
 # PCL page-enter curve: drop 16 px from above, 5 px with Fluent and 11 px with a

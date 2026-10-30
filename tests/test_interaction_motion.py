@@ -82,6 +82,22 @@ class AnimatorTests(unittest.TestCase):
             self.anim._step()
         self.assertAlmostEqual(self.anim.get('x'), shown)
 
+    def test_preview_loader_close_drops_backlog_and_waits_for_open_file(self):
+        import threading, time as clock
+        from mod_grid import PreviewLoader
+        loader = PreviewLoader((32, 18))
+        started, decoded = threading.Event(), []
+        def slow(path, size):
+            started.set(); clock.sleep(.2); decoded.append(path)
+            return b''
+        with patch.object(PreviewLoader, 'decode', side_effect=slow):
+            for i in range(5):
+                loader.request(('k', i), f'p{i}')
+            self.assertTrue(started.wait(1))
+            loader.close()
+        self.assertFalse(loader.thread.is_alive())  # the file being read was released
+        self.assertEqual(decoded, ['p0'])          # queued requests were not decoded
+
     def test_unchanged_widget_options_are_not_reapplied(self):
         from app import update_widget
         widget = Mock(); widget.cget.side_effect = {'state': 'disabled', 'text': 'A'}.get

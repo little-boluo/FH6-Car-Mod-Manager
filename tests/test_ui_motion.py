@@ -41,7 +41,15 @@ class UiMotionTests(unittest.TestCase):
         for job in self.root.tk.call('after', 'info'):
             self.root.tk.call('after', 'cancel', job)
         self.root.destroy()
-        self.temp.cleanup()
+        # Antivirus and the search indexer briefly lock freshly written files on Windows.
+        for attempt in range(50):
+            try:
+                self.temp.cleanup()
+                break
+            except PermissionError:
+                if attempt == 49:
+                    raise
+                time.sleep(.1)
         animation.set_enabled(True)
         self.assertEqual(self.errors, [])
 
