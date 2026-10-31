@@ -10,6 +10,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import traceback
+import webbrowser
 
 from core import Manager, ModError, FileLock, atomic_json, cars_from_exe, layout_from_exe
 from discovery import discover
@@ -22,6 +23,8 @@ from animation import Animator, out_fluent, out_back, MIDDLE
 from motion_widgets import MotionProgress, DropHighlight
 import i18n
 from i18n import t
+from version import APP_VERSION
+import update_check
 
 from animation import lerp_color
 from ui_theme import (BG, PANEL, TEXT, MUTED, ACCENT_DARK, TRANSPARENT, GREEN, Card, ScrollPage, RoundedNavButton,
@@ -67,6 +70,8 @@ class Application:
         # Periodic checks run on worker threads so they never stall a frame.
         self.game_events = queue.Queue()
         self.watch_events = queue.Queue()
+        self.update_events = queue.Queue()
+        self.update_notice, self._update_busy = None, False
         self._probe_busy = self._watch_busy = False
         self._probe_epoch = 0
         self.removing = None
@@ -85,7 +90,7 @@ class Application:
                 pass
         i18n.set_language(self.config.get('language', 'zh'))
         animation.set_enabled(self.config.get('animations', True))  # set "animations": false in settings.json to disable
-        root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.8'))
+        root.title(t('FH6 Car Mod Manager · 车辆模组管理器') + ' ' + APP_VERSION)
         root.geometry(f'1440x{min(960, max(700, root.winfo_screenheight()-80))}')
         root.minsize(1050, 670)
         root.configure(bg=BG)
@@ -105,6 +110,8 @@ class Application:
             root.after(250, self.init_drop)
             root.after(0, self.check_game)
             root.after(2000, self.watch)
+            if self.config.get('update_check', True):
+                root.after(4000, lambda: self.check_updates(manual=False))
 
     def setup_style(self):
         setup_style(self.root)
@@ -127,8 +134,11 @@ class Application:
         self.selection_text = tk.StringVar(value=t('选择一张车辆卡片开始管理'))
         self.status = tk.StringVar(value=t('请在游戏关闭时安装或切换模组'))
 
-        header = GradientHeader(self.root, 'FH6', t('车辆模组管理器'), 'v0.8.8')
+        header = GradientHeader(self.root, 'FH6', t('车辆模组管理器'), 'v' + APP_VERSION)
         header.pack(fill='x')
+        self.header = header
+        if self.update_notice:  # keep a found update visible after a language rebuild
+            header.set_notice(*self.update_notice)
         self.page_buttons = {}
         for key, label, icon in [('mods', t('模组管理'), 'grid'), ('settings', t('设置'), 'gear'), ('help', t('帮助'), 'help')]:
             b = RoundedNavButton(header, label, lambda k=key: self.show_page(k), icon=icon)
@@ -265,6 +275,17 @@ class Application:
         self.buttons[-1].pack(side='left', padx=(0, 10))
         self.button(maintenance_row, t('恢复中断切换'), self.recover).configure(icon='restore')
         self.buttons[-1].pack(side='left')
+        updates = Card(settings, padding=15, title=t('更新'))
+        updates.pack(fill='x', pady=(0, 12))
+        ttk.Label(updates.body, text=t('当前版本 v{0}。只向 GitHub 查询最新发布版本号，不会自动下载或安装。').format(APP_VERSION),
+                  style='CardMuted.TLabel').pack(anchor='w', pady=(0, 10))
+        updates_row = ttk.Frame(updates.body, style='Card.TFrame')
+        updates_row.pack(fill='x')
+        self.update_check_value = tk.BooleanVar(value=self.config.get('update_check', True))
+        ttk.Checkbutton(updates_row, text=t('启动时检查新版本'), variable=self.update_check_value,
+                        command=self.set_update_check, style='Card.TCheckbutton').pack(side='left', padx=(0, 16))
+        self.button(updates_row, t('立即检查更新'), self.check_updates).configure(icon='refresh')
+        self.buttons[-1].pack(side='left')
 
         help_page = self.pages['help'].body
         ttk.Label(help_page, text=t('使用帮助'), style='Title.TLabel').pack(anchor='w', pady=(0, 14))
@@ -314,7 +335,7 @@ class Application:
             child.destroy()
         self.buttons = []
         self.build()
-        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器 0.8.8'))
+        self.root.title(t('FH6 Car Mod Manager · 车辆模组管理器') + ' ' + APP_VERSION)
         if self.manager:
             self.folder.set(str(self.manager.folder))
             self.show_vehicle_directory()
@@ -530,7 +551,8 @@ class Application:
         if hasattr(self, 'thumbnails') and self.thumbnails.drain():
             self.tree.redraw()
         for events, handler in ((getattr(self, 'game_events', None), self._game_checked),
-                                (getattr(self, 'watch_events', None), self._watched)):
+                                (getattr(self, 'watch_events', None), self._watched),
+                                (getattr(self, 'update_events', None), self._update_checked)):
             while events is not None:
                 try:
                     handler(*events.get_nowait())
@@ -557,6 +579,8 @@ class Application:
         else:
             removing = getattr(self, 'removing', None)
             self.removing = None
+            if isinstance(removing, list) and isinstance(result, dict):
+                removing = [name for name in removing if name in result.get('done', ())]  # only real deletions
             if not exc and removing:
                 # Show disappearance only after the real recycle/delete succeeds.
                 self.tree.animate_remove(removing, lambda: self._finish_job(exc, result, callback))
@@ -751,8 +775,8 @@ class Application:
                         r.filename, size_text(r.size), datetime.fromtimestamp(r.modified).strftime('%Y-%m-%d %H:%M')),
                 ('enabled' if r.enabled else 'disabled',)))
         self.tree.replace(entries)
-        if old and self.tree.exists(old[0]):
-            self.tree.selection_set(old[0])
+        if old and self.tree.selection_restore(old):
+            pass
         elif self.tree.get_children():
             self.tree.selection_set(self.tree.get_children()[0])
         enabled = sum(r.enabled for r in self.rows.values())
@@ -769,9 +793,15 @@ class Application:
 
     def selected(self, *_):
         ids = self.tree.selection()
+        if len(ids) > 1:
+            rows = [self.rows[i] for i in ids if i in self.rows]
+            disable = bool(rows) and all(r.enabled for r in rows)
+            self.toggle_btn.configure(text=(t('停用所选 {0} 个') if disable else t('启用所选 {0} 个')).format(len(ids)))
+            set_var(self.selection_text, t('已选择 {0} 个模组 · Ctrl+单击增减，Shift+单击连选，Esc 只保留一个').format(len(ids)))
+            return
         r = self.rows.get(ids[0]) if ids else None
         self.toggle_btn.configure(text=t('停用所选版本') if r and r.enabled else t('启用所选版本'))
-        set_var(self.selection_text, r.filename if r else t('单击卡片选择，双击切换启用；同名版本只启用一个'))
+        set_var(self.selection_text, r.filename if r else t('单击卡片选择，双击切换启用；Ctrl / Shift+单击可多选'))
 
     def watch(self):
         """Scan the mod folder off the UI thread every two seconds; refresh only on change."""
@@ -798,6 +828,46 @@ class Application:
         elif result != self.auto_signature:
             self.refresh()
 
+    def check_updates(self, manual=True):
+        """Ask GitHub for the latest release on a worker thread; poll() shows the answer."""
+        if self._update_busy:
+            return
+        self._update_busy = True
+        if manual:
+            self.status.set(t('正在检查更新…'))
+        def work():
+            try:
+                self.update_events.put((manual, update_check.fetch_latest(), None))
+            except Exception as exc:  # offline, rate-limited, proxy, malformed reply
+                self.update_events.put((manual, None, exc))
+        threading.Thread(target=work, name='update-check', daemon=True).start()
+
+    def _update_checked(self, manual, latest, exc):
+        self._update_busy = False
+        if exc is not None:
+            self.log(exc)
+            if manual:
+                self.status.set(t('检查更新失败'))
+                messagebox.showwarning(t('检查更新'), t('暂时无法连接 GitHub 检查更新：\n') + str(exc), parent=self.root)
+            return
+        tag, page = latest
+        if update_check.is_newer(tag):
+            self.update_notice = (t('新版本 {0}').format(tag), lambda: webbrowser.open(page))
+            self.header.set_notice(*self.update_notice)
+            self.status.set(t('发现新版本 {0}，点击右上角查看').format(tag))
+        elif manual:
+            self.status.set(t('已是最新版本 v{0}').format(APP_VERSION))
+            messagebox.showinfo(t('检查更新'), t('已是最新版本 v{0}').format(APP_VERSION), parent=self.root)
+
+    def set_update_check(self):
+        settings = dict(self.config, update_check=bool(self.update_check_value.get()))
+        try:
+            atomic_json(self.config_path, settings)
+            self.config = settings
+        except Exception as exc:
+            self.update_check_value.set(self.config.get('update_check', True))
+            self.error(exc)
+
     def thumbnail_for(self, filename):
         r = self.rows.get(filename)
         if not r or not self.manager:
@@ -814,18 +884,20 @@ class Application:
         if not ids or ids[0] not in self.rows:
             self.status.set(t('请先在模组宫格中选择一辆车'))
             return
-        filename = ids[0]
-        r = self.rows[filename]
-        original_name = self.thumb_catalog.get((r.base + '.zip').casefold())
-        original = self.manager.vehicles / original_name if original_name else None
         game_root = self.manager.vehicles.parent.parent if self.manager.vehicles else None
         try:
-            old_image = self.thumbnails.invalidate(self.manager.folder / filename, original, game_root)
-            if old_image:
-                self.tree.images.pop(str(old_image), None)
-            self.thumbnail_for(filename)
+            # Every selected card; other vehicles keep their cached previews.
+            for filename in [i for i in ids if i in self.rows]:
+                r = self.rows[filename]
+                original_name = self.thumb_catalog.get((r.base + '.zip').casefold())
+                original = self.manager.vehicles / original_name if original_name else None
+                old_image = self.thumbnails.invalidate(self.manager.folder / filename, original, game_root)
+                if old_image:
+                    self.tree.images.pop(str(old_image), None)
+                self.thumbnail_for(filename)
             self.tree.redraw()
-            self.status.set(t('正在重建所选车辆预览：') + filename)
+            self.status.set(t('正在重建所选车辆预览：') + ids[0] if len(ids) == 1
+                            else t('正在重建 {0} 辆车的预览').format(len(ids)))
         except Exception as exc:
             self.error(exc)
 
@@ -868,6 +940,10 @@ class Application:
         ids = self.tree.selection()
         if not ids:
             return
+        if len(ids) > 1:
+            rows = [self.rows[i] for i in ids if i in self.rows]
+            self.run_batch('disable' if rows and all(r.enabled for r in rows) else 'enable', ids)
+            return
         filename = ids[0]
         try:
             m = self.manager.get(filename)
@@ -886,12 +962,18 @@ class Application:
     def enable_selected(self):
         if not self.can_edit() or not self.manager or not self.tree.selection():
             return
+        if len(self.tree.selection()) > 1:
+            self.run_batch('enable', self.tree.selection())
+            return
         filename = self.tree.selection()[0]
         self.run(t('正在启用所选版本并禁用同名版本'),
                  lambda: self.guard_game(lambda: self.manager.enable(filename)), self.focus_file)
 
     def delete_selected(self):
         if not self.can_edit() or not self.manager or not self.tree.selection():
+            return
+        if len(self.tree.selection()) > 1:
+            self.delete_many(self.tree.selection())
             return
         filename = self.tree.selection()[0]
         try:
@@ -908,6 +990,47 @@ class Application:
         self.run(t('正在删除所选模组'),
                  lambda: self.guard_game(lambda: self.manager.delete(filename, expected=(m.size, m.modified))),
                  lambda name: self.status.set(t('已删除：') + name), remove=filename)
+
+    BATCH_LABELS = {'enable': '正在启用所选模组', 'disable': '正在停用所选模组', 'delete': '正在删除所选模组'}
+
+    def run_batch(self, action, ids, expected=None):
+        ids = list(ids)
+        self.run(t(self.BATCH_LABELS[action]),
+                 lambda: self.guard_game(lambda: self.manager.batch(action, ids, expected=expected)),
+                 lambda result: self.batch_done(action, result),
+                 remove=ids if action == 'delete' else None)
+
+    def batch_done(self, action, result):
+        done = {'enable': t('已启用 {0} 个'), 'disable': t('已停用 {0} 个'), 'delete': t('已删除 {0} 个')}[action]
+        summary = done.format(len(result['done']))
+        if result['skipped']:
+            summary += t('，跳过 {0} 个').format(len(result['skipped']))
+        if result['errors']:
+            summary += t('，失败 {0} 个').format(len(result['errors']))
+        self.status.set(summary)
+        if action != 'delete':
+            self.tree.selection_restore(result['done'])
+        if result['skipped'] or result['errors']:
+            text = summary
+            if result['skipped']:
+                text += t('\n\n跳过：\n') + '\n'.join(result['skipped'][:10])
+            if result['errors']:
+                text += t('\n\n失败原因：\n') + '\n'.join(result['errors'][:10])
+            messagebox.showinfo(t('批量操作结果'), text, parent=self.root)
+
+    def delete_many(self, ids):
+        rows = [self.rows[i] for i in ids if i in self.rows]
+        if not rows:
+            return
+        listing = '\n'.join(r.filename for r in rows[:10]) + ('\n…' if len(rows) > 10 else '')
+        if not messagebox.askyesno(t('删除所选模组'),
+                t('删除以下 {0} 个模组文件？\n\n{1}\n\n默认交给 Windows 回收站处理；只删除所选文件，同名其他版本保留。\n删除启用版本后，不会自动启用其他版本。').format(len(rows), listing),
+                parent=self.root):
+            return
+        if not self.can_edit():
+            return
+        # Delete only files that are still exactly what was confirmed.
+        self.run_batch('delete', [r.filename for r in rows], expected={r.filename: (r.size, r.modified) for r in rows})
 
     def choose_import(self):
         if not self.can_edit():

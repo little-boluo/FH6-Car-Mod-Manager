@@ -169,6 +169,8 @@ class ModGrid(ttk.Frame):
         self.items, self.images = OrderedDict(), OrderedDict()
         self.image_stamps = {}
         self.chosen, self.disabled, self.columns = None, False, 1
+        # Multi-select: ``chosen`` is the focused (primary) card, ``marked`` every selected card.
+        self.marked, self.anchor = set(), None
         self.hovered = None
         self.canvas = tk.Canvas(self, bg=BG, highlightthickness=0, takefocus=True)
         self.scroll = ttk.Scrollbar(self, command=self._scroll)
@@ -188,7 +190,7 @@ class ModGrid(ttk.Frame):
         self.canvas.bind('<Leave>', lambda _: self._hover(None))
         self.painter = RetainedCanvas(self.canvas)
         self.positions, self._frame_images, self._line_cache = {}, [], {}
-        self._ids, self._ghosts, self._exiting = None, OrderedDict(), None
+        self._ids, self._ghosts, self._exiting = None, OrderedDict(), set()
         self._laid_out = False
         self._x_offset = 0  # the grid is centred when columns do not fill the width
         self._redraw_id = None
@@ -251,17 +253,66 @@ class ModGrid(ttk.Frame):
 
     # -- Treeview-like API used by the application --
     def selection(self):
-        return (self.chosen,) if self.chosen in self.items else ()
+        """The focused card first, then the other selected cards in grid order."""
+        if self.chosen not in self.items:
+            return ()
+        return (self.chosen, *[i for i in self._id_list() if i in self.marked and i != self.chosen])
+
+    def _mark(self, marked, primary):
+        old = set(self.marked)
+        if self.chosen is not None:
+            old.add(self.chosen)
+        new = {i for i in marked if i in self.items} | {primary}
+        self.chosen, self.marked = primary, new
+        for iid in old - new:
+            self.anim.to(('sel', iid), 0.0, 200, start=self.anim.get(('sel', iid), 1.0))
+        for iid in new - old:
+            self.anim.to(('sel', iid), 1.0, 200, start=self.anim.get(('sel', iid), 0.0))
+        self._request_draw()
+        self.on_select()
 
     def selection_set(self, iid):
+        """Select exactly one card (plain click, arrow keys)."""
         if iid in self.items:
-            old, self.chosen = self.chosen, iid
-            if old != iid:
-                if old is not None:
-                    self.anim.to(('sel', old), 0.0, 200, start=self.anim.get(('sel', old), 1.0))
-                self.anim.to(('sel', iid), 1.0, 200, start=self.anim.get(('sel', iid), 0.0))
-            self._request_draw()
+            self.anchor = iid
+            self._mark({iid}, iid)
+
+    def selection_toggle(self, iid):
+        """Ctrl+click: add or remove one card, keeping the rest."""
+        if iid not in self.items:
+            return
+        self.anchor = iid
+        if iid in self.marked and len(self.marked) > 1:
+            rest = self.marked - {iid}
+            primary = self.chosen if self.chosen in rest else next(i for i in self._id_list() if i in rest)
+            self._mark(rest, primary)
+        else:
+            self._mark(self.marked | {iid}, iid)
+
+    def selection_range(self, iid):
+        """Shift+click: every card between the anchor and this one."""
+        ids = self._id_list()
+        if iid not in self.items:
+            return
+        anchor = self.anchor if self.anchor in self.items else (self.chosen if self.chosen in self.items else iid)
+        a, b = sorted((ids.index(anchor), ids.index(iid)))
+        self._mark(set(ids[a:b + 1]), iid)
+
+    def selection_all(self):
+        if self.items:
+            primary = self.chosen if self.chosen in self.items else self._id_list()[0]
+            self._mark(set(self.items), primary)
+
+    def selection_restore(self, ids):
+        """Re-apply a previous selection after the list was rebuilt; False if none survived."""
+        alive = [i for i in ids if i in self.items]
+        if not alive:
+            return False
+        if set(alive) != (self.marked | {self.chosen}) or self.chosen != alive[0]:
+            self._mark(set(alive), alive[0])
+        else:
             self.on_select()
+        return True
 
     def get_children(self):
         return tuple(self.items)
@@ -334,11 +385,12 @@ class ModGrid(ttk.Frame):
         # Cards that left a visible slot fade out where they stood.
         for iid in previous:
             if iid not in self.items and iid in self.positions and iid not in self._ghosts:
-                if not animation.ENABLED or iid == self._exiting:
+                if not animation.ENABLED or iid in self._exiting:
                     continue
                 self._ghosts[iid] = (previous[iid][0], previous[iid][1], self.positions[iid])
                 self.anim.to(('gone', iid), 1.0, self.GHOST_MS, linear, start=self.anim.get(('exit', iid), 0.0),
                              done=lambda iid=iid: self._bury(iid))
+        self.marked &= set(self.items)
         self._forget_stale()
         self._request_draw()
 
@@ -349,20 +401,29 @@ class ModGrid(ttk.Frame):
                 self.anim.forget((key, iid))
         self._request_draw()
 
-    def animate_remove(self, iid, done):
-        if iid not in self.items or not self.winfo_ismapped():
+    def animate_remove(self, iids, done):
+        """Shrink and fade one card or several together, then call ``done`` once."""
+        iids = [i for i in ([iids] if isinstance(iids, str) else iids) if i in self.items]
+        if not iids or not self.winfo_ismapped():
+            for iid in iids:
+                self.items.pop(iid, None)
+            self._changed()
             done()
             return
-        def finish():
+        remaining = set(iids)
+        def finish(iid):
+            remaining.discard(iid)
             self.items.pop(iid, None)
             self._changed()
-            self._exiting = None
+            self._exiting.discard(iid)
             self.anim.forget(('exit', iid))
             self._request_draw()
-            done()
-        self._exiting = iid
+            if not remaining:
+                done()
+        self._exiting |= set(iids)
         # PCL card removal: shrink slightly while fading out.
-        self.anim.to(('exit', iid), 1.0, self.EXIT_MS, linear, start=0.0, done=finish)
+        for iid in iids:
+            self.anim.to(('exit', iid), 1.0, self.EXIT_MS, linear, start=0.0, done=lambda iid=iid: finish(iid))
 
     def state(self, states):
         disabled = 'disabled' in states
@@ -432,7 +493,12 @@ class ModGrid(ttk.Frame):
         self.canvas.focus_set()
         iid = self._hit(event)
         if iid:
-            self.selection_set(iid)
+            if event.state & 0x4:      # Ctrl
+                self.selection_toggle(iid)
+            elif event.state & 0x1:    # Shift
+                self.selection_range(iid)
+            else:
+                self.selection_set(iid)
 
     def _hover(self, event):
         hovered = self._hit(event) if event is not None and not self.disabled else None
@@ -454,7 +520,11 @@ class ModGrid(ttk.Frame):
     def _key(self, event):
         if self.disabled:
             return 'break'
-        if event.keysym in ('space', 'Return'):
+        if event.keysym.lower() == 'a' and event.state & 0x4:
+            self.selection_all()
+        elif event.keysym == 'Escape' and self.chosen in self.items:
+            self.selection_set(self.chosen)
+        elif event.keysym in ('space', 'Return'):
             self.on_toggle()
         elif event.keysym in ('Left', 'Right', 'Up', 'Down') and self.items:
             ids = self._id_list()
@@ -635,7 +705,7 @@ class ModGrid(ttk.Frame):
         W, H = self.CARD_W, self.CARD_H
         enabled = 'enabled' in tags
         hover = 0.0 if self.disabled else self.anim.get(('hover', iid), 0.0)
-        sel = self.anim.get(('sel', iid), 1.0 if iid == self.chosen else 0.0)
+        sel = self.anim.get(('sel', iid), 1.0 if iid == self.chosen or iid in self.marked else 0.0)
         en = self.anim.get(('en', iid), 1.0 if enabled else 0.0)
         pulse = self.anim.get(('pulse', iid), 0.0)
         alpha = enter_alpha(enter) * (1 - _exit_fade(exit_progress))

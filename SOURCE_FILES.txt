@@ -23,6 +23,7 @@ renderer_check.py
 renderer_runtime.py
 requirements-build.txt
 requirements.txt
+tests/test_batch_and_updates.py
 tests/test_build_checks.py
 tests/test_core.py
 tests/test_interaction_motion.py
@@ -38,6 +39,8 @@ tests/test_ui_motion.py
 tests/test_vehicle_names.py
 thumbnail_failures.py
 thumbnails.py
+update_check.py
+version.py
 ui_theme.py
 vendor/ForzaTechStudio/.gitattributes
 vendor/ForzaTechStudio/.gitignore

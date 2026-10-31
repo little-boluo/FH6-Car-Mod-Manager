@@ -79,6 +79,16 @@ Click a vehicle card and use the buttons at the bottom to manage it. You can als
 同一车辆可以保留多份模组，但最多同时启用一份。备用版本会自动添加区分后缀；切换时，管理器会自动调整名称，无需手动交换文件名。  
 You can keep multiple mods for the same car, with at most one enabled at a time. Backup versions receive distinguishing suffixes automatically. The manager adjusts their names when switching, so you do not need to swap filenames manually.
 
+#### 多选与批量操作 / Select several mods
+
+按住 **Ctrl** 单击可逐个加选或取消，按住 **Shift** 单击可连续选择，**Ctrl+A** 选择当前列表中的全部卡片，**Esc** 只保留当前卡片。选中多张卡片后，可以一次启用、停用、删除或重建缩略图：  
+Hold **Ctrl** and click to add or remove cards, hold **Shift** and click to select a range, press **Ctrl+A** to select every card in the current list, and **Esc** to keep only the current card. With several cards selected you can enable, disable, delete or rebuild previews in one go:
+
+- 批量启用时，同一车辆最多启用一个版本：所选卡片中已有启用版本的车辆保持不变，否则启用所选的第一个版本。  
+  Batch enabling keeps at most one version per car: a car whose selected versions include an enabled one stays as it is; otherwise the first selected version is enabled.
+- 批量删除会先列出全部文件请你确认；某个文件失败不会影响其余文件，结果会逐条列出。  
+  Batch deletion lists every file for confirmation first; a failure on one file does not stop the others, and the result lists each one.
+
 ### 5. 搜索与筛选 / Search and filter
 
 左侧可筛选 **全部模组、已启用、已禁用、同名版本**。搜索框按文件名查找，可与筛选同时使用。  
@@ -157,6 +167,11 @@ Automatic cache cleanup does not remove custom pictures. Deleted or replaced mod
 
 如果只是想重新生成某一辆车的图片，请使用 **重建所选缩略图**，无需清空整个缓存目录。  
 To regenerate just one vehicle’s picture, use **Rebuild preview** instead of clearing the entire cache folder.
+
+### 12. 检查更新 / Check for updates
+
+管理器启动几秒后会向 GitHub 查询最新发布的版本号；有新版本时，标题栏右上角会出现 **新版本 vX.Y.Z**，点击即可打开发布页面。只查询版本号，不会自动下载或安装。可在 **设置 → 更新** 中关闭启动检查，或点击 **立即检查更新**。  
+A few seconds after starting, the manager asks GitHub for the latest released version; if there is a newer one, **New version vX.Y.Z** appears at the top right of the title bar and opens the release page when clicked. Only the version number is requested; nothing is downloaded or installed automatically. You can turn off the startup check or click **Check for updates now** in **Settings → Updates**.
 
 ## 更新内容 / Release notes
 

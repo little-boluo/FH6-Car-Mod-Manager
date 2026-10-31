@@ -381,6 +381,10 @@ def setup_style(root):
           lightcolor=[('pressed', ACCENT), ('active', ACCENT_LIGHT)], darkcolor=[('pressed', ACCENT), ('active', ACCENT_LIGHT)])
     s.configure('Idle.Vertical.TScrollbar', background=BG, lightcolor=BG, darkcolor=BG)
     s.map('Idle.Vertical.TScrollbar', background=[('active', BG)], lightcolor=[('active', BG)], darkcolor=[('active', BG)])
+    s.configure('Card.TCheckbutton', background=PANEL, foreground=TEXT, indicatorcolor=PANEL,
+                indicatorbackground=PANEL, focuscolor=PANEL)
+    s.map('Card.TCheckbutton', background=[('active', PANEL)], indicatorcolor=[('selected', ACCENT), ('disabled', GRAY_FILL)],
+          foreground=[('disabled', GRAY_TEXT)])
     s.configure('Horizontal.TProgressbar', background=ACCENT, troughcolor=BG, borderwidth=0, thickness=3)
     for name in ('TButton', 'Accent.TButton', 'Danger.TButton', 'Nav.TButton', 'NavSelected.TButton'):
         s.configure(name, background=PANEL, foreground=TEXT, padding=(14, 8))  # ttk fallback only
@@ -748,7 +752,21 @@ class GradientHeader(tk.Canvas):
         self.paint = Retained(self)
         self.tabs, self._image, self._width = [], None, None
         self.texts = (title, subtitle, caption)
+        self.notice, self.notice_command, self._notice_hover = None, None, 0.0
+        self.anim = Animator(self, self._layout)
         self.bind('<Configure>', self._resized)
+        self.bind('<Destroy>', lambda e: self.anim.stop() if e.widget is self else None)
+
+    def set_notice(self, text, command=None):
+        """A clickable white pill left of the caption (e.g. a new version), or None to remove it."""
+        self.notice, self.notice_command = text, command
+        self._layout()
+        if text and 'notice_bg' in self.paint.items:
+            for name in ('notice_bg', 'notice_text'):
+                item = self.paint.items[name]
+                self.tag_bind(item, '<Button-1>', lambda e: self.notice_command and self.notice_command())
+                self.tag_bind(item, '<Enter>', lambda e: (self.configure(cursor='hand2'), self.anim.to('notice_hover', 1.0, 100)))
+                self.tag_bind(item, '<Leave>', lambda e: (self.configure(cursor=''), self.anim.to('notice_hover', 0.0, 200)))
 
     @staticmethod
     def color_at(fraction):
@@ -777,10 +795,26 @@ class GradientHeader(tk.Canvas):
         self.paint('subtitle', 'text', (30 + self.title_font.measure(title), height / 2 + 1), anchor='w',
                    text=subtitle, fill=BLUE_6, font=self.sub_font)
         self.paint('caption', 'text', (width - 20, height / 2), anchor='e', text=caption, fill=BLUE_6, font=self.sub_font)
+        right_limit = width - 40 - self.sub_font.measure(caption)
+        shown = bool(self.notice)
+        notice = self.notice or ''
+        pill_w = self.sub_font.measure(notice) + 28
+        px2 = right_limit + 12
+        px1 = px2 - pill_w
+        hover = self.anim.get('notice_hover')
+        self.paint('notice_bg', 'polygon', rounded_points(px1, height / 2 - 13, px2, height / 2 + 13, 13), smooth=True,
+                   splinesteps=24, fill=lerp_color(PANEL, BLUE_7, hover), outline='', state='normal' if shown else 'hidden')
+        self.paint('notice_text', 'text', ((px1 + px2) / 2, height / 2), text=notice, fill=ACCENT_DARK, font=self.sub_font,
+                   state='normal' if shown else 'hidden')
+        if shown:
+            right_limit = px1 - 12
         widths = [int(tab.cget('width')) for tab in self.tabs]
         gap = 10
         x = (width - sum(widths) - gap * max(0, len(widths) - 1)) / 2
         left_limit = 40 + self.title_font.measure(title) + self.sub_font.measure(subtitle)
+        total = sum(widths) + gap * max(0, len(widths) - 1)
+        if x + total > right_limit:
+            x = right_limit - total  # leave room for the caption and notice
         x = max(x, left_limit)  # narrow windows: never cover the logo
         for i, (tab, w) in enumerate(zip(self.tabs, widths)):
             self.paint(f'tab{i}', 'window', (round(x), height // 2), anchor='w', window=tab)

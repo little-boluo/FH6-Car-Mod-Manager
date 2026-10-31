@@ -375,6 +375,50 @@ class Manager:
                 raise ModError(t('删除未完成，文件仍在原目录。'))
             return m.filename
 
+    def batch(self, action, filenames, expected=None, recycler=None):
+        """Enable, disable or delete several files; one failure never stops the rest.
+
+        ``done`` holds the resulting file names (new names after enabling or
+        disabling, removed names after deleting).  Enabling keeps at most one
+        version per car: a selected version that is already enabled wins,
+        otherwise the first selected version of that car is enabled.
+        """
+        result = {'done': [], 'skipped': [], 'errors': []}
+        mods = []
+        for name in filenames:
+            try:
+                mods.append(self.get(name))
+            except ModError as exc:
+                result['errors'].append(f'{name}：{exc}')
+        if action == 'enable':
+            keep = {m.group for m in mods if m.enabled}
+            chosen = set()
+            for m in mods:
+                if m.enabled:
+                    result['done'].append(m.filename)
+                elif m.group in keep or m.group in chosen:
+                    result['skipped'].append(m.filename + t('：同一车辆只能启用一个版本'))
+                else:
+                    chosen.add(m.group)
+                    self._batch_step(result, m.filename, lambda m=m: self.enable(m.filename))
+        elif action == 'disable':
+            for m in mods:
+                self._batch_step(result, m.filename, lambda m=m: self.disable(m.filename))
+        elif action == 'delete':
+            for m in mods:
+                stamp = (expected or {}).get(m.filename)
+                self._batch_step(result, m.filename, lambda m=m, stamp=stamp: self.delete(m.filename, recycler, stamp))
+        else:
+            raise ValueError(action)
+        return result
+
+    @staticmethod
+    def _batch_step(result, name, operation):
+        try:
+            result['done'].append(operation())
+        except (OSError, ModError) as exc:
+            result['errors'].append(f'{name}：{exc}')
+
     def import_files(self, paths, progress=None):
         paths = list(paths)
         result = {'imported': [], 'skipped': [], 'errors': [], 'renamed': []}

@@ -219,6 +219,70 @@ class UiMotionTests(unittest.TestCase):
         self.assertEqual(button.anim.get('sel'), 1.0)
         button.destroy()
 
+    def test_multi_select_with_ctrl_shift_keys_and_refresh(self):
+        app, grid, n = self.app, self.app.tree, self.names
+        grid.selection_set(n[0]); grid.selection_toggle(n[2])
+        self.assertEqual(grid.selection(), (n[2], n[0]))
+        grid.selection_range(n[4])                      # anchor n[2] .. n[4]
+        self.assertEqual(grid.selection(), (n[4], n[2], n[3]))
+        self.assertEqual(app.toggle_btn.cget('text'), '停用所选 3 个')
+        self.assertIn('已选择 3 个', app.selection_text.get())
+        app.render(); self.pump(.05)                    # a refresh keeps the selection
+        self.assertEqual(grid.selection(), (n[4], n[2], n[3]))
+        grid._key(SimpleNamespace(keysym='Escape', state=0))
+        self.assertEqual(grid.selection(), (n[4],))
+        grid._key(SimpleNamespace(keysym='a', state=0x4))
+        self.assertEqual(len(grid.selection()), len(n))
+        grid.selection_toggle(n[4])                     # removing the focused card moves the focus
+        self.assertNotIn(n[4], grid.selection()); self.assertEqual(len(grid.selection()), len(n) - 1)
+        self.pump(.3)
+        self.assertEqual(grid.anim.get(('sel', n[1])), 1.0)
+
+    def test_batch_delete_removes_only_deleted_cards(self):
+        app, n = self.app, self.names
+        app.tree.selection_set(n[0]); app.tree.selection_toggle(n[1]); app.tree.selection_toggle(n[2])
+        app.manager = Mock()
+        app.manager.batch.return_value = {'done': [n[0], n[2]], 'skipped': [], 'errors': [n[1] + '：locked']}
+        app.can_edit = lambda: True
+        def refresh():
+            for name in (n[0], n[2]):
+                app.rows.pop(name, None)
+            app.render()
+        app.refresh = refresh
+        with patch('app.messagebox.askyesno', return_value=True) as ask, patch('app.messagebox.showinfo') as info:
+            app.delete_selected()
+            self.assertIn('3', ask.call_args.args[1])
+            until = time.monotonic() + 3
+            while (app.busy or app.jobs.qsize()) and time.monotonic() < until:
+                app.poll(); self.pump(.05)
+            self.pump(.5)
+        action, ids = app.manager.batch.call_args.args
+        self.assertEqual((action, sorted(ids)), ('delete', sorted(n[:3])))
+        self.assertEqual(sorted(app.manager.batch.call_args.kwargs['expected']), sorted(n[:3]))
+        self.assertFalse(app.tree.exists(n[0])); self.assertFalse(app.tree.exists(n[2]))
+        self.assertTrue(app.tree.exists(n[1]))
+        info.assert_called_once()                       # the failure is reported
+
+    def test_newer_release_shows_clickable_notice_in_title_bar(self):
+        app = self.app
+        app._update_checked(False, ('v0.0.1', 'https://github.com/x'), None)
+        self.assertIsNone(app.header.notice)            # older or equal: silent
+        page = 'https://github.com/little-boluo/FH6-Car-Mod-Manager/releases/tag/v99.0.0'
+        app._update_checked(False, ('v99.0.0', page), None)
+        self.assertIn('v99.0.0', app.header.notice)
+        self.root.update()
+        item = app.header.paint.items['notice_bg']
+        self.assertEqual(app.header.itemcget(item, 'state'), 'normal')
+        with patch('app.webbrowser.open') as browser:
+            app.header.notice_command()
+        browser.assert_called_once_with(page)
+        with patch('app.messagebox.showwarning') as warn:
+            app._update_checked(True, None, OSError('offline'))
+        warn.assert_called_once()
+        with patch('app.messagebox.showwarning') as warn:
+            app._update_checked(False, None, OSError('offline'))  # automatic check stays quiet
+        warn.assert_not_called()
+
     def test_disabled_animations_finish_navigation_and_delete_immediately(self):
         animation.set_enabled(False)
         self.app.show_page('settings'); self.root.update()
