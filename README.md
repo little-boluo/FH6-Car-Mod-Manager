@@ -1,7 +1,7 @@
 # FH6 Car Mod Manager
 
-**《极限竞速：地平线 6》车辆模组管理器 · v0.8.8**  
-**Forza Horizon 6 Car Mod Manager · v0.8.8**
+**《极限竞速：地平线 6》车辆模组管理器 · v0.8.9**  
+**Forza Horizon 6 Car Mod Manager · v0.8.9**
 
 在一个窗口中导入、启用、切换和删除车辆模组，通过缩略图宫格区分不同车辆及同名模组版本。  
 Import, enable, switch and delete car mods in one window. Thumbnail cards help you distinguish vehicles and different versions of the same mod.
@@ -174,6 +174,17 @@ To regenerate just one vehicle’s picture, use **Rebuild preview** instead of c
 A few seconds after starting, the manager asks GitHub for the latest released version; if there is a newer one, **New version vX.Y.Z** appears at the top right of the title bar and opens the release page when clicked. Only the version number is requested; nothing is downloaded or installed automatically. You can turn off the startup check or click **Check for updates now** in **Settings → Updates**.
 
 ## 更新内容 / Release notes
+
+### v0.8.9 — 多选批量操作与检查更新 / Multi-select and update check
+
+- 支持多选：Ctrl+单击增减、Shift+单击连选、Ctrl+A 全选、Esc 只保留一张；刷新和搜索后保留选择。  
+  Multi-select: Ctrl+click to add or remove, Shift+click for a range, Ctrl+A for all, Esc to keep one; the selection survives refreshes and searches.
+- 多选后可批量启用、停用、删除和重建缩略图；同一车辆最多启用一个版本，单个文件失败不影响其余文件，结果逐条列出。  
+  Selected cards can be enabled, disabled, deleted or have their previews rebuilt together; at most one version per car is enabled, one failing file does not stop the rest, and the result lists each file.
+- 批量删除先列出全部文件确认，只删除确认后未变化的文件。  
+  Batch deletion lists every file for confirmation and deletes only files that have not changed since.
+- 启动后自动向 GitHub 检查新版本，有新版本时在标题栏显示，点击打开发布页面；只查询版本号，不会自动下载。可在 设置 → 更新 中关闭或手动检查。  
+  Checks GitHub for a newer release after startup and shows it in the title bar, opening the release page when clicked; only the version number is requested and nothing is downloaded. Turn it off or check manually in Settings → Updates.
 
 ### v0.8.8 — 支持下载副本文件名 / Import download copies
 
