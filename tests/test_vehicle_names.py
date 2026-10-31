@@ -37,12 +37,50 @@ class VehicleNameTests(unittest.TestCase):
         self.assertEqual((self.original / source.name).read_bytes(), b'original vehicle')
         self.assertEqual(source.read_bytes(), b'mod archive unchanged')
 
-    def test_wrong_names_and_download_suffixes_are_rejected(self):
-        names = ['POR_911_24.zip', 'POR_911_23 (1).zip', 'POR_911_23_v2.zip', 'POR_911_23__fh6mm_v1.zip']
+    def test_names_that_do_not_start_with_a_car_are_rejected(self):
+        # A different car, a longer word, a shorter name, the wrong extension or no separator.
+        names = ['POR_911_24.zip', 'POR_911_234.zip', 'POR_911_2.zip', 'XPOR_911_23 (1).zip', 'POR_911_23A.zip']
         result = self.m.import_files([self.source(name) for name in names])
         self.assertEqual(result['imported'], [])
         self.assertEqual(len(result['errors']), len(names))
         self.assertEqual(self.m.scan(), [])
+
+    def test_download_copies_and_suffixes_install_under_the_original_name(self):
+        names = ['POR_911_23 (1).zip', 'POR_911_23(2).ZIP', 'POR_911_23 - 副本.zip', 'POR_911_23_v2.zip']
+        sources = [self.source(name, f'download{i}') for i, name in enumerate(names)]
+        result = self.m.import_files(sources)
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['imported'], ['POR_911_23.zip', 'POR_911_23__fh6mm_v1.zipdisabled',
+                                              'POR_911_23__fh6mm_v2.zipdisabled', 'POR_911_23__fh6mm_v3.zipdisabled'])
+        self.assertEqual(result['renamed'][0], 'POR_911_23 (1).zip → POR_911_23.zip')
+        self.assertEqual(len(result['renamed']), 4)
+        self.assertEqual({m.group for m in self.m.scan()}, {'por_911_23'})
+        for source in sources:
+            self.assertEqual(source.read_bytes(), b'mod archive unchanged')  # downloads are copied, never moved
+
+    def test_misnamed_copy_inside_mod_folder_is_renamed_in_place(self):
+        (self.mods / 'POR_911_23.zip').write_bytes(b'installed version')
+        copy = self.mods / 'POR_911_23 (1).zip'; copy.write_bytes(b'downloaded into the mod folder')
+        result = self.m.import_files([copy])
+        self.assertEqual(result['imported'], ['POR_911_23__fh6mm_v1.zipdisabled'])
+        self.assertFalse(copy.exists())
+        self.assertEqual((self.mods / 'POR_911_23__fh6mm_v1.zipdisabled').read_bytes(), b'downloaded into the mod folder')
+        self.assertEqual((self.mods / 'POR_911_23.zip').read_bytes(), b'installed version')
+        # A file that already carries the manager's name is left alone.
+        again = self.m.import_files([self.mods / 'POR_911_23.zip'])
+        self.assertEqual(again['imported'], []); self.assertEqual(len(again['skipped']), 1)
+
+    def test_longest_car_name_wins(self):
+        (self.original / 'POR_911_23_GT3.zip').write_bytes(b'original vehicle')
+        result = self.m.import_files([self.source('POR_911_23_GT3 (1).zip'), self.source('POR_911_23 (1).zip', 'other')])
+        self.assertEqual(result['imported'], ['POR_911_23_GT3.zip', 'POR_911_23.zip'])
+
+    def test_renamed_list_only_shows_real_changes(self):
+        result = self.m.import_files([self.source('por_911_23.zip')])
+        self.assertEqual(result['imported'], ['POR_911_23.zip'])
+        self.assertEqual(result['renamed'], ['por_911_23.zip → POR_911_23.zip'])
+        result = self.m.import_files([self.source('POR_911_23.zip', 'again')])
+        self.assertNotIn('POR_911_23.zip → POR_911_23.zip', result['renamed'])
 
     def test_full_filename_extension_must_match(self):
         (self.original / 'BMW_TEST.bin').write_bytes(b'not a matching ZIP filename')

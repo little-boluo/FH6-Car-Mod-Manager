@@ -46,21 +46,23 @@ Drag one or more car `.zip` files into the window, or click **Import ZIP** to se
 拖入时会显示高亮提示和 ZIP 数量；安装过程中显示当前文件、处理阶段和进度。进度表示已处理的工作量，拒绝或跳过的文件也算已处理，请以完成提示中的结果为准。  
 Dragging ZIP files into the window displays a highlight and file count. During installation, the manager shows the current file, processing stage and progress. Progress includes rejected or skipped files, so check the completion message for the actual result.
 
-导入文件的完整名称必须与原版 `media\cars` 文件夹中的某个车辆文件名一致，包含 `.zip` 扩展名，但不区分大小写。  
-The complete filename must match a car file in the original `media\cars` folder, including the `.zip` extension. Matching is case-insensitive.
+导入文件的名称必须以原版 `media\cars` 文件夹中的某个车辆文件名开头，不区分大小写。浏览器下载时添加的 `(1)` 等后缀可以直接导入，管理器会在模组目录中改为它支持的命名：没有同名版本时使用原始车辆文件名，已有时作为禁用的备用版本保存。车辆名称后面必须是空格、括号、下划线、短横线等分隔符；有多个车辆名称符合时，使用最长的那个。  
+The filename must start with a car filename from the original `media\cars` folder; matching is case-insensitive. Browser suffixes such as `(1)` can be imported as they are: the manager renames the file in the mod folder to its own naming, using the original car filename when that car has no version yet, or saving it as a disabled backup version otherwise. The car name must be followed by a separator such as a space, bracket, underscore or hyphen; when several car names fit, the longest one is used.
 
 例如，原版目录中有 `Example_Car.zip`：  
 For example, if the original folder contains `Example_Car.zip`:
 
 | 文件名 / Filename | 结果 / Result |
 | --- | --- |
-| `Example_Car.zip` | 允许导入 / Accepted |
-| `example_car.ZIP` | 允许导入 / Accepted |
-| `Example_Car (1).zip` | 拒绝导入 / Rejected |
-| `Example_Car_Custom.zip` | 拒绝导入 / Rejected |
+| `Example_Car.zip` | 导入为 / Imported as `Example_Car.zip` |
+| `example_car.ZIP` | 导入为 / Imported as `Example_Car.zip` |
+| `Example_Car (1).zip` | 导入并改名 / Imported and renamed to `Example_Car.zip` |
+| `Example_Car_Custom.zip` | 导入并改名 / Imported and renamed to `Example_Car.zip` |
+| `Example_Car2.zip` | 拒绝导入 / Rejected（车辆名后不是分隔符 / no separator after the car name） |
+| `Other_Car.zip` | 拒绝导入 / Rejected（不以车辆文件名开头 / does not start with a car filename） |
 
-如果下载时增加了 `(1)` 等后缀，请先恢复正确的车辆文件名。导入会复制文件到模组目录，保留下载的原文件，也不会覆盖原版车辆目录中的文件。  
-If your browser added a suffix such as `(1)`, restore the correct car filename before importing. Importing copies the file into the mod folder, preserves the downloaded original, and does not overwrite files in the original car folder.
+已有同名版本时，新文件保存为 `Example_Car__fh6mm_v1.zipdisabled` 等禁用版本。导入完成的提示会列出所有被改名的文件。导入会复制文件到模组目录，保留下载的原文件，也不会覆盖原版车辆目录中的文件；如果 `Example_Car (1).zip` 这类文件已经在模组目录中，导入它会直接就地改名。  
+If the car already has a version, the new file is saved as a disabled version such as `Example_Car__fh6mm_v1.zipdisabled`. The completion message lists every renamed file. Importing copies the file into the mod folder, preserves the downloaded original and does not overwrite files in the original car folder; if a file such as `Example_Car (1).zip` is already in the mod folder, importing it renames it in place.
 
 ### 4. 启用、禁用与切换版本 / Enable, disable and switch versions
 

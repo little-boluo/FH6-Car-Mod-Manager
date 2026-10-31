@@ -269,7 +269,7 @@ class Application:
         help_page = self.pages['help'].body
         ttk.Label(help_page, text=t('使用帮助'), style='Title.TLabel').pack(anchor='w', pady=(0, 14))
         for title, content in [
-            (t('导入车辆模组'), t('把一个或多个 ZIP 拖到窗口中，或点击左下角的导入按钮。\n文件名必须与原版 media\\cars 中的车辆文件名一致。')),
+            (t('导入车辆模组'), t('把一个或多个 ZIP 拖到窗口中，或点击左下角的导入按钮。\n文件名须以原版 media\\cars 中的车辆文件名开头，如 Example_Car (1).zip，导入后自动改为管理器命名。')),
             (t('管理同名版本'), t('单击卡片选择模组，双击或按空格切换启用状态。\n同一车型只能启用一个版本，其余版本会自动保留并禁用。')),
             (t('游戏运行时锁定'), t('游戏运行期间，全部按钮、筛选、搜索和拖放都会锁定。\n退出游戏后自动恢复；删除模组会移入 Windows 回收站。')),
             (t('关于界面'), t('蓝色导航与浅色卡片布局参考 Plain Craft Launcher。\n本程序独立实现，不属于 PCL 或 Forza 官方项目。'))]:
@@ -939,6 +939,8 @@ class Application:
         text = t('导入 {0} 个，跳过 {1} 个，失败 {2} 个。').format(n, len(result['skipped']), len(result['errors']))
         if result['imported']:
             text += t('\n\n实际文件名：\n') + '\n'.join(result['imported'][:12])
+        if result.get('renamed'):
+            text += t('\n\n已改为管理器命名：\n') + '\n'.join(result['renamed'][:12])
         if result['errors']:
             text += t('\n\n失败原因：\n') + '\n'.join(result['errors'][:8])
         if result['skipped']:

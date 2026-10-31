@@ -117,6 +117,31 @@ def parse_filename(filename):
     return stem, 0, enabled
 
 
+def match_vehicle(filename, catalog):
+    """Return the game's original car file name for an import, or None.
+
+    An exact (case-insensitive) match wins.  Otherwise the file name must start
+    with a car name followed by a separator, as in browser copies such as
+    ``Example_Car (1).zip``; the longest such car name is used, so a longer
+    car name is never mistaken for a shorter one, and ``Example_Car2.zip``
+    never matches ``Example_Car.zip``.
+    """
+    key = filename.casefold()
+    if key in catalog:
+        return catalog[key]
+    if not key.endswith('.zip'):
+        return None
+    stem, best = key[:-4], None
+    for low, original in catalog.items():
+        if not low.endswith('.zip'):
+            continue
+        prefix = low[:-4]
+        if (prefix and len(stem) > len(prefix) and stem.startswith(prefix)
+                and not stem[len(prefix)].isalnum() and (best is None or len(prefix) > len(best[0]))):
+            best = (prefix, original)
+    return best[1] if best else None
+
+
 @dataclass(frozen=True)
 class GameLayout:
     platform: str
@@ -352,7 +377,7 @@ class Manager:
 
     def import_files(self, paths, progress=None):
         paths = list(paths)
-        result = {'imported': [], 'skipped': [], 'errors': []}
+        result = {'imported': [], 'skipped': [], 'errors': [], 'renamed': []}
         # Reload every batch; the base game's car list can change after updates.
         catalog = self.vehicle_catalog()
         weights = []
@@ -384,15 +409,16 @@ class Manager:
                     valid_name(source.name)
                     if source.suffix.casefold() != '.zip' or not regular(source):
                         raise ModError(t('请选择实际 ZIP 文件；不要拖入文件夹或压缩包内的虚拟文件。'))
-                    original_name = catalog.get(source.name.casefold())
+                    original_name = match_vehicle(source.name, catalog)
                     if original_name is None:
-                        raise ModError(t('文件名未匹配游戏 media\\cars 中的任何车辆文件，拒绝导入。请使用完整原始车辆文件名（含 .zip），不要附加版本号或副本后缀。'))
-                    if source.parent.resolve() == self.folder:
-                        result['skipped'].append(source.name + t('：已经在模组目录中'))
-                        continue
+                        raise ModError(t('文件名开头未匹配游戏 media\\cars 中的任何车辆文件，拒绝导入。文件名须以原始车辆文件名开头（如 Example_Car.zip 或 Example_Car (1).zip）。'))
                     parsed = parse_filename(source.name)
                     if parsed is None:
                         raise ModError(t('ZIP 文件名缺少名称。'))
+                    in_place = source.parent.resolve() == self.folder
+                    if in_place and parsed[0].casefold() == original_name[:-4].casefold():
+                        result['skipped'].append(source.name + t('：已经在模组目录中'))
+                        continue
                     base = original_name[:-4]
                     group = [m for m in self.scan() if m.group == base.casefold()]
                     if group:
@@ -403,6 +429,13 @@ class Manager:
                     else:
                         dest_name = self.next_disabled(base, occupied)
                     valid_name(dest_name)
+                    if in_place:
+                        # A download copy such as "Example_Car (1).zip" already sits in the mod
+                        # folder, where the game ignores it: give it the manager's name instead.
+                        self.move(source, self.path(dest_name))
+                        result['imported'].append(dest_name)
+                        result['renamed'].append(f'{source.name} → {dest_name}')
+                        continue
                     if shutil.disk_usage(self.folder).free < source.stat().st_size:
                         raise ModError(t('目标磁盘空间不足。'))
                     before = source.stat()
@@ -432,6 +465,8 @@ class Manager:
                     finally:
                         temp.unlink(missing_ok=True)
                     result['imported'].append(dest_name)
+                    if dest_name != source.name:
+                        result['renamed'].append(f'{source.name} → {dest_name}')
                 except (OSError, ModError) as exc:
                     result['errors'].append(source.name + '：' + str(exc))
                 finally:
