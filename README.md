@@ -1,7 +1,7 @@
 # FH6 Car Mod Manager
 
-**《极限竞速：地平线 6》车辆模组管理器 · v0.8.7**  
-**Forza Horizon 6 Car Mod Manager · v0.8.7**
+**《极限竞速：地平线 6》车辆模组管理器 · v0.8.8**  
+**Forza Horizon 6 Car Mod Manager · v0.8.8**
 
 在一个窗口中导入、启用、切换和删除车辆模组，通过缩略图宫格区分不同车辆及同名模组版本。  
 Import, enable, switch and delete car mods in one window. Thumbnail cards help you distinguish vehicles and different versions of the same mod.
@@ -159,6 +159,17 @@ Automatic cache cleanup does not remove custom pictures. Deleted or replaced mod
 To regenerate just one vehicle’s picture, use **Rebuild preview** instead of clearing the entire cache folder.
 
 ## 更新内容 / Release notes
+
+### v0.8.8 — 支持下载副本文件名 / Import download copies
+
+- 文件名以原版车辆文件名开头即可导入，例如浏览器下载时变成的 `Example_Car (1).zip`；车辆名后须是空格、括号、下划线、短横线等分隔符，多个车辆名称符合时取最长的。  
+  Files whose names start with an original car filename can be imported, such as browser copies like `Example_Car (1).zip`; the car name must be followed by a separator (space, bracket, underscore, hyphen…), and the longest matching car name wins.
+- 导入后在模组目录中自动改为管理器命名：没有同名版本时使用原始车辆文件名，已有时保存为禁用的备用版本。  
+  Imported files are renamed in the mod folder to the manager naming: the original car filename when the car has no version yet, otherwise a disabled backup version.
+- 已在模组目录中的 `Example_Car (1).zip` 类文件，导入时直接就地改名。  
+  Files such as `Example_Car (1).zip` that are already in the mod folder are renamed in place when imported.
+- 导入完成的提示列出所有被改名的文件。  
+  The import summary lists every renamed file.
 
 ### v0.8.7 — 缩略图提速与省空间 / Faster thumbnails, less disk
 
