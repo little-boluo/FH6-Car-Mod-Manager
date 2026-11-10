@@ -29,6 +29,7 @@ jobs:
           name: windows-build-log
           path: |
             build-windows.log
+            renderer-build.log
             test-results.log
             renderer-check.log
             renderer-resources.log

@@ -62,8 +62,18 @@ try {
             -p:Platform=x64 -p:FH6ThumbnailBuild=true -p:PublishProfile= `
             -p:WindowsAppSDKSelfContained=true -p:PublishSingleFile=false `
             -p:PublishTrimmed=false `
-            -p:PublishReadyToRun=false -o (Join-Path $output 'renderer')
-        if ($LASTEXITCODE -ne 0) { throw '3D renderer build failed. See build-windows.log; the partial output is not a complete release.' }
+            -p:PublishReadyToRun=false -o (Join-Path $output 'renderer') `
+            "-flp:LogFile=renderer-build.log;Verbosity=normal;Encoding=UTF-8"
+        if ($LASTEXITCODE -ne 0) {
+            # dotnet's console output does not reach the transcript; copy the errors from its own log.
+            if (Test-Path 'renderer-build.log') {
+                $errors = @(Select-String -Path 'renderer-build.log' -Pattern ': error ' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique -First 25)
+                Write-Host 'Renderer build errors (full log: renderer-build.log):'
+                if ($errors.Count) { $errors | ForEach-Object { Write-Host "  $_" } }
+                else { Get-Content 'renderer-build.log' -Tail 40 | ForEach-Object { Write-Host "  $_" } }
+            }
+            throw '3D renderer build failed. Send renderer-build.log and build-windows.log; the partial output is not a complete release.'
+        }
         if (!(Test-Path (Join-Path $output 'renderer\ForzaTech Studio.exe'))) {
             throw 'Renderer executable was not created.'
         }
