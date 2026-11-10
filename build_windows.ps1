@@ -1,6 +1,8 @@
 param([switch]$ManagerOnly)
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
+# Show Python output as it happens (and keep it in the transcript if the build is interrupted).
+$env:PYTHONUNBUFFERED = '1'
 if ($env:OS -ne 'Windows_NT') { throw 'Build this project on Windows 10/11 x64.' }
 Start-Transcript -Path (Join-Path $PSScriptRoot 'build-windows.log') -Force
 try {
