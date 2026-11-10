@@ -173,7 +173,23 @@ To regenerate just one vehicle’s picture, use **Rebuild preview** instead of c
 管理器启动几秒后会向 GitHub 查询最新发布的版本号；有新版本时，标题栏右上角会出现 **新版本 vX.Y.Z**，点击即可打开发布页面。只查询版本号，不会自动下载或安装。可在 **设置 → 更新** 中关闭启动检查，或点击 **立即检查更新**。  
 A few seconds after starting, the manager asks GitHub for the latest released version; if there is a newer one, **New version vX.Y.Z** appears at the top right of the title bar and opens the release page when clicked. Only the version number is requested; nothing is downloaded or installed automatically. You can turn off the startup check or click **Check for updates now** in **Settings → Updates**.
 
+### 13. 节省硬盘空间（可选）/ Save disk space (optional)
+
+程序文件夹里附带 `SaveDiskSpace.bat`。先关闭管理器，再双击运行，它会用 Windows 自带的 NTFS 压缩（`compact /EXE:LZX`）压缩本文件夹里的程序文件，通常能让实际占用减少一半以上。不删除任何文件，程序照常运行；需要 NTFS 磁盘，解压新版本后可再运行一次。要还原，在命令行运行 `SaveDiskSpace.bat /undo`。  
+The program folder includes `SaveDiskSpace.bat`. Close the manager, then double-click it: it compresses the program files in this folder with the NTFS compression built into Windows (`compact /EXE:LZX`), usually more than halving the space they take. Nothing is deleted and everything runs as before; it needs an NTFS drive, and you can run it again after extracting a new version. To undo it, run `SaveDiskSpace.bat /undo` from a command prompt.
+
 ## 更新内容 / Release notes
+
+### 下一版 — 渲染组件瘦身 / Next release — leaner renderer
+
+- 渲染组件只引用实际用到的 Windows App SDK 组件（WinUI、Foundation、DWrite 等），不再附带 ONNX Runtime、DirectML、Windows AI 和小组件（Widgets）等从不加载的文件，`renderer` 文件夹约减少 45 MB。  
+  The renderer references only the Windows App SDK components it uses (WinUI, Foundation, DWrite…) and no longer ships ONNX Runtime, DirectML, Windows AI or Widgets files it never loads, about 45 MB less in the `renderer` folder.
+- WinUI 的系统提示语言只保留英文、简体中文和繁体中文（原为 86 种），其他系统语言自动使用英文，文件数减少约 170 个。  
+  WinUI system strings keep only English, Simplified and Traditional Chinese (previously 86 languages); other display languages fall back to English, about 170 fewer files.
+- 新增可选的 `SaveDiskSpace.bat`，用 Windows 自带的 NTFS 压缩进一步减少实际占用，不删除任何文件，可随时还原。  
+  New optional `SaveDiskSpace.bat` uses the NTFS compression built into Windows to cut the space taken further, without deleting anything; it can be undone at any time.
+- 构建时检查渲染组件体积：若不需要的组件或多余语言重新出现，或必需文件缺失，构建直接失败。  
+  The build checks the renderer footprint and fails if unneeded components or extra languages come back, or if a required file is missing.
 
 ### v0.8.9 — 多选批量操作与检查更新 / Multi-select and update check
 

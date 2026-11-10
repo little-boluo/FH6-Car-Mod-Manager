@@ -6,7 +6,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from build_checks import smoke_test, validate_environment, check_renderer_resources, validate_sources
+from build_checks import (smoke_test, validate_environment, check_renderer_resources, validate_sources,
+                          check_renderer_footprint, REQUIRED_RENDERER_FILES)
 
 
 class BuildCheckTests(unittest.TestCase):
@@ -84,6 +85,48 @@ class BuildCheckTests(unittest.TestCase):
             root=Path(folder); (root/'resources.pri').write_bytes(b'presence-check fixture, not a real PRI')
             check_renderer_resources(root, root/'report.txt')
             self.assertIn('Application resources.pri: OK',(root/'report.txt').read_text())
+
+
+class RendererFootprintTests(unittest.TestCase):
+    def lean_renderer(self, root):
+        for name in REQUIRED_RENDERER_FILES:
+            (root/name).write_bytes(b'x')
+        for culture in ('en-us', 'zh-CN', 'zh-TW'):
+            (root/culture).mkdir()
+            (root/culture/'Microsoft.ui.xaml.dll.mui').write_bytes(b'x')
+
+    def check(self, root):
+        with redirect_stdout(io.StringIO()):
+            check_renderer_footprint(root, root/'report.txt')
+
+    def test_lean_renderer_passes_and_is_reported(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder); self.lean_renderer(root)
+            self.check(root)
+            report=(root/'report.txt').read_text(encoding='utf-8')
+            self.assertIn('WinUI languages: en-us, zh-CN, zh-TW', report)
+            self.assertIn('Unused Windows App SDK files: none', report)
+
+    def test_ai_and_ml_payload_fails_the_build(self):
+        for name in ('onnxruntime.dll', 'DirectML.dll', 'Microsoft.Windows.AI.Text.dll',
+                     'Microsoft.Windows.Widgets.dll', 'workloads.json'):
+            with self.subTest(name), tempfile.TemporaryDirectory() as folder:
+                root=Path(folder); self.lean_renderer(root); (root/name).write_bytes(b'x')
+                with self.assertRaisesRegex(RuntimeError, 'metapackage'):
+                    self.check(root)
+
+    def test_extra_languages_fail_the_build(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder); self.lean_renderer(root)
+            (root/'de-DE').mkdir(); (root/'de-DE'/'Microsoft.ui.xaml.dll.mui').write_bytes(b'x')
+            with self.assertRaisesRegex(RuntimeError, 'language'):
+                self.check(root)
+
+    def test_missing_dwritecore_fails_the_build(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder); self.lean_renderer(root); (root/'DWriteCore.dll').unlink()
+            with self.assertRaisesRegex(RuntimeError, 'DWriteCore.dll'):
+                self.check(root)
 
 
 if __name__ == '__main__':

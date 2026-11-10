@@ -1,6 +1,16 @@
 # Windows 构建与使用
 
-本压缩包是 0.8.9 源码构建包，不含预编译 EXE。本版新增多选批量操作与启动时检查更新；渲染组件与 0.8.7 相同。
+本压缩包是 0.8.9 之后的源码构建包（版本号暂仍为 0.8.9），不含预编译 EXE。本版精简渲染组件体积，管理器功能与 0.8.9 相同。
+
+## 下一版：渲染组件瘦身
+
+- 渲染工程改为直接引用 Windows App SDK 1.8 的 WinUI、DWrite、Foundation、InteractiveExperiences 组件包（版本与原 `Microsoft.WindowsAppSDK 1.8.251106002` 元包完全一致），不再引用元包。元包会带入 `Microsoft.WindowsAppSDK.Runtime`，使自包含构建复制整个运行库 MSIX，其中 ONNX Runtime、DirectML、Windows AI、Widgets 共约 45 MB 渲染器从不加载。
+- DWrite 组件包缺少 `package.appxfragment`，组件模式下生成 WinRT 激活清单会因此报错；工程中的 `FH6SkipComponentsWithoutAppxFragment` 只在这一步跳过它（`DWriteCore.dll` 照常发布）。
+- `FH6TrimMuiLanguages` 发布时只保留 `en-us`、`zh-CN`、`zh-TW` 的 WinUI 语言文件。
+- 构建新增体积检查（写入 `renderer-resources.log` 末尾）：发现 AI/ML/Widgets 文件、多余语言，或缺少 `Microsoft.ui.xaml.dll`、`DWriteCore.dll`、`Microsoft.WindowsAppRuntime.dll` 时构建失败。
+- 发布包附带可选的 `SaveDiskSpace.bat`（NTFS `compact /EXE:LZX`，`/undo` 还原）。
+
+验收建议：完整构建（不要用 `-ManagerOnly`），确认 `renderer-check.log` 通过，`renderer-resources.log` 末尾显示 `WinUI languages: en-us, zh-CN, zh-TW` 和 `Unused Windows App SDK files: none`；对比 `package-size-report.txt` 中 Renderer 大小（0.8.9 约 222.8 MB，预计约 175 MB）；实际生成几辆车的缩略图，效果应与 0.8.9 相同。然后关闭管理器，双击 `dist\FH6CarModManager\SaveDiskSpace.bat`，完成后查看文件夹属性中的“占用空间”，再启动管理器确认缩略图照常生成。若构建失败，请提供 `build-windows.log`、`renderer-resources.log` 和 `renderer-check.log`。
 
 ## v0.8.9 多选批量操作与检查更新
 

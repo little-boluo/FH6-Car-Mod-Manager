@@ -113,4 +113,52 @@ class LeanBuildTests(unittest.TestCase):
                     self.assertIn(name,declared,f'{page}: {name}')
 
 
+class RendererFootprintBuildTests(unittest.TestCase):
+    root=Path(__file__).resolve().parents[1]
+    project=root/'vendor/ForzaTechStudio/ForzaTechStudio/FH6ThumbnailRenderer.csproj'
+
+    def packages(self):
+        tree=ET.parse(self.project).getroot()
+        return {p.attrib['Include']:p.attrib['Version'] for p in tree.findall('.//PackageReference')}
+
+    def test_windows_app_sdk_components_replace_the_metapackage(self):
+        packages=self.packages()
+        # The metapackage brings Runtime, whose self-contained payload is the whole MSIX (AI, ML, Widgets).
+        for unwanted in ('Microsoft.WindowsAppSDK','Microsoft.WindowsAppSDK.Runtime','Microsoft.WindowsAppSDK.AI',
+                         'Microsoft.WindowsAppSDK.ML','Microsoft.WindowsAppSDK.Widgets'):
+            self.assertNotIn(unwanted,packages)
+        # Exactly the versions the 1.8.251106002 metapackage pins.
+        self.assertEqual(packages['Microsoft.WindowsAppSDK.WinUI'],'1.8.251105000')
+        self.assertEqual(packages['Microsoft.WindowsAppSDK.DWrite'],'1.8.25090401')
+        self.assertEqual(packages['Microsoft.WindowsAppSDK.Foundation'],'1.8.251104000')
+        self.assertEqual(packages['Microsoft.WindowsAppSDK.InteractiveExperiences'],'1.8.251104001')
+
+    def test_component_build_workarounds_are_in_place(self):
+        tree=ET.parse(self.project).getroot()
+        targets={t.attrib['Name']:t for t in tree.findall('Target')}
+        skip=targets['FH6SkipComponentsWithoutAppxFragment']
+        self.assertEqual(skip.attrib['BeforeTargets'],'CreateWinRTRegistration')
+        self.assertEqual(targets['FH6RestoreComponentList'].attrib['AfterTargets'],'CreateWinRTRegistration')
+        mui=targets['FH6TrimMuiLanguages']
+        self.assertEqual(mui.attrib['AfterTargets'],'ComputeResolvedFilesToPublishList')
+        text=ET.tostring(mui,encoding='unicode')
+        for culture in ('en-us','zh-CN','zh-TW'):
+            self.assertIn(f"'{culture}'",text)
+
+    def test_disk_space_script_is_shipped_and_safe_for_cmd(self):
+        script=self.root/'SaveDiskSpace.bat'
+        data=script.read_bytes()
+        self.assertFalse(data.startswith(b'\xef\xbb\xbf'),'a BOM breaks the first cmd line')
+        self.assertNotIn(b'\n',data.replace(b'\r\n',b''),'cmd needs CRLF line endings')
+        text=data.decode('utf-8')
+        lines=text.splitlines()
+        first_non_ascii=next(i for i,line in enumerate(lines) if not line.isascii())
+        self.assertLess(lines.index('chcp 65001 >nul'),first_non_ascii,'switch to UTF-8 before any Chinese text')
+        self.assertIn('compact /c /s /i /q /exe:lzx',text)
+        self.assertIn('compact /u /s /i /q /exe',text)
+        self.assertIn('FH6CarModManager.exe',text)
+        self.assertIn('SaveDiskSpace.bat',(self.root/'SOURCE_FILES.txt').read_text(encoding='utf-8').split())
+        self.assertIn('SaveDiskSpace.bat',(self.root/'build_windows.ps1').read_text(encoding='utf-8'))
+
+
 if __name__=='__main__' :unittest.main()

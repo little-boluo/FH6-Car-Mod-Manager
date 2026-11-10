@@ -48,11 +48,11 @@ try {
             throw 'Renderer executable was not created.'
         }
         & $pythonExe (Join-Path $PSScriptRoot 'build_checks.py') resources (Join-Path $output 'renderer')
-        if ($LASTEXITCODE -ne 0) { throw 'Renderer resource publish check failed; see renderer-resources.log.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Renderer resource/footprint check failed; see renderer-resources.log.' }
         & $pythonExe (Join-Path $PSScriptRoot 'build_checks.py') renderer (Join-Path $output 'FH6CarModManager.exe')
         if ($LASTEXITCODE -ne 0) { throw 'Renderer startup/PNG check failed. See renderer-check.log. Close FH6 before building.' }
     }
-    Copy-Item README.md, THIRD_PARTY_NOTICES.md, WINDOWS_QUICKSTART.md -Destination $output
+    Copy-Item README.md, THIRD_PARTY_NOTICES.md, WINDOWS_QUICKSTART.md, SaveDiskSpace.bat -Destination $output
     New-Item -ItemType Directory -Force (Join-Path $output 'licenses') | Out-Null
     Copy-Item 'licenses\Pillow.txt' (Join-Path $output 'licenses\Pillow.txt')
     Copy-Item 'vendor\ForzaTechStudio\LICENSE' (Join-Path $output 'licenses\ForzaTechStudio-MIT.txt')

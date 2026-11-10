@@ -177,7 +177,15 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.5" />
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7175" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.251106002" />
+    <!-- Windows App SDK 1.8 components, not the Microsoft.WindowsAppSDK metapackage.  The
+         metapackage pulls in Microsoft.WindowsAppSDK.Runtime, which makes a self-contained build
+         copy the whole runtime MSIX: ONNX Runtime, DirectML, Windows AI and Widgets (about 45 MB)
+         that the renderer never loads.  Without Runtime the payload comes only from the components
+         below.  Versions are exactly those the 1.8.251106002 metapackage pins. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="1.8.251105000" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" Version="1.8.25090401" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="1.8.251104000" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="1.8.251104001" />
     <PackageReference Include="SharpCompress" Version="0.42.1" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="Syroot.BinaryData" Version="5.2.2" />
@@ -191,5 +199,34 @@
     <Content Include="Native\forzatech_acl.dll" Condition="Exists('Native\forzatech_acl.dll')" TargetPath="forzatech_acl.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\customcube.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- Component builds read runtimes-framework\package.appxfragment from every referenced
+       component to generate the WinRT activation manifest, but the DWrite package (DWriteCore.dll,
+       no WinRT classes) ships none.  Leave such components out of that one step only; their files
+       were already added to the payload by AddMicrosoftWindowsAppSDKPayloadFilesFromComponents. -->
+  <Target Name="FH6SkipComponentsWithoutAppxFragment" BeforeTargets="CreateWinRTRegistration">
+    <ItemGroup>
+      <_FH6AllWindowsAppSdkComponents Include="@(WindowsAppSdkComponentPackages)" />
+      <WindowsAppSdkComponentPackages Remove="@(WindowsAppSdkComponentPackages)" Condition="!Exists('%(Identity)runtimes-framework\package.appxfragment')" />
+    </ItemGroup>
+  </Target>
+  <Target Name="FH6RestoreComponentList" AfterTargets="CreateWinRTRegistration">
+    <ItemGroup>
+      <WindowsAppSdkComponentPackages Remove="@(WindowsAppSdkComponentPackages)" />
+      <WindowsAppSdkComponentPackages Include="@(_FH6AllWindowsAppSdkComponents)" />
+    </ItemGroup>
+  </Target>
+  <!-- WinUI ships its XAML error strings in 86 languages.  Keep English (the system fallback)
+       and Chinese; Windows falls back to English for any other display language. -->
+  <Target Name="FH6TrimMuiLanguages" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <_FH6Mui Include="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.mui'">
+        <FH6Culture>$([System.IO.Path]::GetDirectoryName('%(RelativePath)'))</FH6Culture>
+      </_FH6Mui>
+      <_FH6MuiKept Include="@(_FH6Mui)" Condition="'%(FH6Culture)' == 'en-us' or '%(FH6Culture)' == 'zh-CN' or '%(FH6Culture)' == 'zh-TW'" />
+      <_FH6MuiDropped Include="@(_FH6Mui)" Exclude="@(_FH6MuiKept)" />
+      <ResolvedFileToPublish Remove="@(_FH6MuiDropped)" />
+    </ItemGroup>
+    <Message Importance="high" Text="FH6: kept @(_FH6MuiKept->Count()) WinUI language files, skipped @(_FH6MuiDropped->Count())" />
+  </Target>
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
 </Project>

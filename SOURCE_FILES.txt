@@ -1,6 +1,7 @@
 .github/workflows/build-windows.yml
 Build_EXE.bat
 README.md
+SaveDiskSpace.bat
 Start.bat
 THIRD_PARTY_NOTICES.md
 WINDOWS_QUICKSTART.md
