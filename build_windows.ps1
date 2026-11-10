@@ -45,9 +45,14 @@ try {
     & $pythonExe -m PyInstaller --noconfirm --clean --windowed --onedir --noupx --name FH6CarModManager app.py
     if ($LASTEXITCODE -ne 0) { throw 'Manager build failed.' }
     $output = Join-Path $PSScriptRoot 'dist\FH6CarModManager'
-    Step 'Checking the packaged manager'
-    & $pythonExe (Join-Path $PSScriptRoot 'build_checks.py') smoke (Join-Path $output 'FH6CarModManager.exe')
-    if ($LASTEXITCODE -ne 0) { throw 'Packaged EXE/Tk grid smoke test failed.' }
+    if ($env:FH6_SKIP_UI_SMOKE -eq '1') {
+        # Hosted CI runners have no interactive desktop for the Tk window; local builds always run it.
+        Write-Warning 'FH6_SKIP_UI_SMOKE=1: skipping the packaged manager UI check.'
+    } else {
+        Step 'Checking the packaged manager'
+        & $pythonExe (Join-Path $PSScriptRoot 'build_checks.py') smoke (Join-Path $output 'FH6CarModManager.exe')
+        if ($LASTEXITCODE -ne 0) { throw 'Packaged EXE/Tk grid smoke test failed.' }
+    }
     if (!$ManagerOnly) {
         $project = Join-Path $PSScriptRoot 'vendor\ForzaTechStudio\ForzaTechStudio\FH6ThumbnailRenderer.csproj'
         $rendererOutput = Join-Path $output 'renderer'

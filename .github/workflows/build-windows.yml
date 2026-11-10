@@ -14,9 +14,11 @@ jobs:
           architecture: x64
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.201'
       - name: Build manager and renderer
         shell: pwsh
+        env:
+          FH6_SKIP_UI_SMOKE: '1'
         run: ./build_windows.ps1
       - uses: actions/upload-artifact@v4
         with:
@@ -30,6 +32,7 @@ jobs:
           path: |
             build-windows.log
             renderer-build.log
+            package-size-report.txt
             test-results.log
             renderer-check.log
             renderer-resources.log
