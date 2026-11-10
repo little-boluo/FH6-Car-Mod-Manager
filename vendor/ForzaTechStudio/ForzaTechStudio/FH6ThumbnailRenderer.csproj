@@ -41,7 +41,7 @@
     <AssemblyName>ForzaTech Studio</AssemblyName>
     <Title>FH6 Thumbnail Renderer</Title>
     <Description>Dedicated vehicle thumbnail build; no FTS main editor shell</Description>
-    <Version>0.8.7</Version>
+    <Version>0.9.0</Version>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <OutputPath>bin\FH6ThumbnailRenderer\</OutputPath>

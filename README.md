@@ -1,7 +1,7 @@
 # FH6 Car Mod Manager
 
-**《极限竞速：地平线 6》车辆模组管理器 · v0.8.9**  
-**Forza Horizon 6 Car Mod Manager · v0.8.9**
+**《极限竞速：地平线 6》车辆模组管理器 · v0.9.0**  
+**Forza Horizon 6 Car Mod Manager · v0.9.0**
 
 在一个窗口中导入、启用、切换和删除车辆模组，通过缩略图宫格区分不同车辆及同名模组版本。  
 Import, enable, switch and delete car mods in one window. Thumbnail cards help you distinguish vehicles and different versions of the same mod.
@@ -180,8 +180,10 @@ The program folder includes `SaveDiskSpace.bat`. Close the manager, then double-
 
 ## 更新内容 / Release notes
 
-### 下一版 — 渲染组件瘦身 / Next release — leaner renderer
+### v0.9.0 — 渲染组件瘦身 / Leaner renderer
 
+- 程序包从约 263 MB 减到约 215 MB，文件数从 1556 个减到 420 个（`renderer` 文件夹 223 MB → 174 MB）。  
+  The package shrinks from about 263 MB to about 215 MB and from 1556 to 420 files (`renderer` folder 223 MB → 174 MB).
 - 渲染组件只打包实际用到的 Windows App SDK 组件（WinUI、Foundation、DWrite 等），不再附带 ONNX Runtime、DirectML、Windows AI 和小组件（Widgets）等从不加载的文件，`renderer` 文件夹约减少 44 MB。  
   The renderer bundles only the Windows App SDK components it uses (WinUI, Foundation, DWrite…) and no longer ships ONNX Runtime, DirectML, Windows AI or Widgets files it never loads, about 44 MB less in the `renderer` folder.
 - WinUI 的系统提示语言只保留英文、简体中文和繁体中文（原为 86 种），其他系统语言自动使用英文，文件数减少约 170 个。  
