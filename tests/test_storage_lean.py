@@ -121,17 +121,21 @@ class RendererFootprintBuildTests(unittest.TestCase):
         tree=ET.parse(self.project).getroot()
         return {p.attrib['Include']:p.attrib['Version'] for p in tree.findall('.//PackageReference')}
 
-    def test_windows_app_sdk_components_replace_the_metapackage(self):
+    def test_payload_comes_from_components_not_the_runtime_msix(self):
         packages=self.packages()
-        # The metapackage brings Runtime, whose self-contained payload is the whole MSIX (AI, ML, Widgets).
-        for unwanted in ('Microsoft.WindowsAppSDK','Microsoft.WindowsAppSDK.Runtime','Microsoft.WindowsAppSDK.AI',
-                         'Microsoft.WindowsAppSDK.ML','Microsoft.WindowsAppSDK.Widgets'):
-            self.assertNotIn(unwanted,packages)
-        # Exactly the versions the 1.8.251106002 metapackage pins.
-        self.assertEqual(packages['Microsoft.WindowsAppSDK.WinUI'],'1.8.251105000')
-        self.assertEqual(packages['Microsoft.WindowsAppSDK.DWrite'],'1.8.25090401')
-        self.assertEqual(packages['Microsoft.WindowsAppSDK.Foundation'],'1.8.251104000')
-        self.assertEqual(packages['Microsoft.WindowsAppSDK.InteractiveExperiences'],'1.8.251104001')
+        # HelixToolkit.WinUI depends on the metapackage, so it must stay referenced at 1.8.
+        self.assertEqual(packages['Microsoft.WindowsAppSDK'],'1.8.251106002')
+        tree=ET.parse(self.project).getroot()
+        package_dir=tree.find('.//MicrosoftWindowsAppSDKPackageDir')
+        self.assertIsNotNone(package_dir)
+        self.assertFalse((package_dir.text or '').strip(),'an empty value selects the component payload')
+        targets={t.attrib['Name']:t for t in tree.findall('Target')}
+        drop=targets['FH6DropUnusedWindowsAppSdkComponents']
+        self.assertEqual(drop.attrib['BeforeTargets'],'AddMicrosoftWindowsAppSDKPayloadFilesFromComponents')
+        condition=drop.find('ItemGroup/WindowsAppSdkComponentPackages').attrib['Condition']
+        self.assertIn('(ai|ml|widgets)',condition)
+        self.assertNotIn("', '",condition.split('IsMatch(')[1].split("'))")[0].split("', '",1)[1],
+                         'MSBuild only accepts the two-argument Regex.IsMatch')
 
     def test_component_build_workarounds_are_in_place(self):
         tree=ET.parse(self.project).getroot()

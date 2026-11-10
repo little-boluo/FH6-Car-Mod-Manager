@@ -112,8 +112,16 @@ class RendererFootprintTests(unittest.TestCase):
                      'Microsoft.Windows.Widgets.dll', 'workloads.json'):
             with self.subTest(name), tempfile.TemporaryDirectory() as folder:
                 root=Path(folder); self.lean_renderer(root); (root/name).write_bytes(b'x')
-                with self.assertRaisesRegex(RuntimeError, 'metapackage'):
+                with self.assertRaisesRegex(RuntimeError, 'MSIX payload'):
                     self.check(root)
+
+    def test_projection_wrappers_listed_in_deps_json_are_allowed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder); self.lean_renderer(root)
+            for name in ('Microsoft.Windows.AI.Projection.dll', 'Microsoft.Windows.Widgets.Projection.dll',
+                         'Microsoft.Graphics.Imaging.Projection.dll', 'Microsoft.ML.OnnxRuntime.dll'):
+                (root/name).write_bytes(b'x')
+            self.check(root)
 
     def test_extra_languages_fail_the_build(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -4,11 +4,12 @@
 
 ## 下一版：渲染组件瘦身
 
-- 渲染工程改为直接引用 Windows App SDK 1.8 的 WinUI、DWrite、Foundation、InteractiveExperiences 组件包（版本与原 `Microsoft.WindowsAppSDK 1.8.251106002` 元包完全一致），不再引用元包。元包会带入 `Microsoft.WindowsAppSDK.Runtime`，使自包含构建复制整个运行库 MSIX，其中 ONNX Runtime、DirectML、Windows AI、Widgets 共约 45 MB 渲染器从不加载。
+- 渲染工程仍引用 `Microsoft.WindowsAppSDK 1.8.251106002`（HelixToolkit.WinUI 依赖它，不引用会退回 1.6 并导致构建失败），但把 `MicrosoftWindowsAppSDKPackageDir` 设为空：自包含发布不再复制整个运行库 MSIX，而是从组件包取文件；`FH6DropUnusedWindowsAppSdkComponents` 再去掉 AI、ML、Widgets 组件。ONNX Runtime、DirectML、Windows AI、Widgets 等约 44 MB 渲染器从不加载的文件因此不再发布；`deps.json` 中登记的几个小型投影 DLL（约 1 MB）照常保留。
 - DWrite 组件包缺少 `package.appxfragment`，组件模式下生成 WinRT 激活清单会因此报错；工程中的 `FH6SkipComponentsWithoutAppxFragment` 只在这一步跳过它（`DWriteCore.dll` 照常发布）。
 - `FH6TrimMuiLanguages` 发布时只保留 `en-us`、`zh-CN`、`zh-TW` 的 WinUI 语言文件。
-- 构建新增体积检查（写入 `renderer-resources.log` 末尾）：发现 AI/ML/Widgets 文件、多余语言，或缺少 `Microsoft.ui.xaml.dll`、`DWriteCore.dll`、`Microsoft.WindowsAppRuntime.dll` 时构建失败。
+- 构建新增体积检查（写入 `renderer-resources.log` 末尾）：发现 AI/ML/Widgets 原生文件、多余语言，或缺少 `Microsoft.ui.xaml.dll`、`DWriteCore.dll`、`Microsoft.WindowsAppRuntime.dll` 时构建失败。
 - 发布包附带可选的 `SaveDiskSpace.bat`（NTFS `compact /EXE:LZX`，`/undo` 还原）。
+- 构建日志：每一步都会在 `build-windows.log` 中写一行 `==>`，失败原因写为 `BUILD FAILED: …`；渲染器编译的完整输出单独保存在 `renderer-build.log`。
 
 验收建议：完整构建（不要用 `-ManagerOnly`），确认 `renderer-check.log` 通过，`renderer-resources.log` 末尾显示 `WinUI languages: en-us, zh-CN, zh-TW` 和 `Unused Windows App SDK files: none`；对比 `package-size-report.txt` 中 Renderer 大小（0.8.9 约 222.8 MB，预计约 175 MB）；实际生成几辆车的缩略图，效果应与 0.8.9 相同。然后关闭管理器，双击 `dist\FH6CarModManager\SaveDiskSpace.bat`，完成后查看文件夹属性中的“占用空间”，再启动管理器确认缩略图照常生成。若构建失败，请提供 `build-windows.log`、`renderer-resources.log` 和 `renderer-check.log`。
 

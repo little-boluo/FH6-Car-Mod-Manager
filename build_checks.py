@@ -68,11 +68,12 @@ def check_renderer_resources(folder, report=None):
         raise RuntimeError('Application resources.pri was not published. See renderer-resources.log; do not copy a PRI from another version.')
 
 
-# Windows App SDK pieces the renderer never loads.  They arrive only through the
-# Microsoft.WindowsAppSDK metapackage (its Runtime package copies the whole runtime MSIX).
-UNUSED_RENDERER_FILES = ('onnxruntime*.dll', 'DirectML.dll', 'Microsoft.ML.OnnxRuntime.dll',
-                         'Microsoft.Windows.AI.*', 'Microsoft.Windows.Widgets*',
-                         'Microsoft.Windows.Workloads*', 'workloads*.json', 'Microsoft.Graphics.Imaging*')
+# Windows App SDK pieces the renderer never loads.  They come from the runtime MSIX payload,
+# which the renderer project replaces with its component packages.  The small *.Projection.dll
+# wrappers stay: the metapackage lists them in deps.json, so they must exist.
+UNUSED_RENDERER_FILES = ('onnxruntime*.dll', 'DirectML.dll', 'Microsoft.Windows.AI.*',
+                         'Microsoft.Windows.Widgets*', 'Microsoft.Windows.Workloads*',
+                         'workloads*.json', 'Microsoft.Graphics.Imaging*')
 KEPT_MUI_CULTURES = ('en-us', 'zh-CN', 'zh-TW')
 REQUIRED_RENDERER_FILES = ('Microsoft.ui.xaml.dll', 'DWriteCore.dll', 'Microsoft.WindowsAppRuntime.dll')
 
@@ -82,7 +83,8 @@ def check_renderer_footprint(folder, report=None):
     folder = Path(folder).resolve()
     report = Path(report) if report is not None else Path(__file__).resolve().parent / 'renderer-resources.log'
     names = {p.name.lower() for p in folder.iterdir() if p.is_file()}
-    unused = sorted({p.name for pattern in UNUSED_RENDERER_FILES for p in folder.glob(pattern)})
+    unused = sorted({p.name for pattern in UNUSED_RENDERER_FILES for p in folder.glob(pattern)
+                     if not p.name.lower().endswith('.projection.dll')})
     if (folder / 'NpuDetect').is_dir():
         unused.append('NpuDetect')
     kept = {c.lower() for c in KEPT_MUI_CULTURES}
@@ -100,7 +102,7 @@ def check_renderer_footprint(folder, report=None):
     print('\n'.join(lines))
     problems = []
     if unused:
-        problems.append('unused AI/ML/Widgets files were published (is the Microsoft.WindowsAppSDK metapackage referenced again?)')
+        problems.append('unused AI/ML/Widgets files were published (the runtime MSIX payload is back: check MicrosoftWindowsAppSDKPackageDir)')
     if extra:
         problems.append(f'{len(extra)} extra WinUI language folders were published (FH6TrimMuiLanguages did not run)')
     if missing:
